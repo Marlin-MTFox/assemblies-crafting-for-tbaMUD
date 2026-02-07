@@ -11,7 +11,7 @@ diff -ruN tbamudmaster/src/act.h tbamudmasterad/src/act.h
   * Begin Functions and defines for act.item.c
 diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.c
 --- tbamudmaster/src/act.informative.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/act.informative.c	2026-02-07 16:02:23.865555900 -0600
++++ tbamudmasterad/src/act.informative.c	2026-02-07 17:03:32.773591400 -0600
 @@ -28,6 +28,7 @@
  #include "modify.h"
  #include "asciimap.h"
@@ -142,7 +142,40 @@ diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.
          if (d->connected == CON_AEDIT)
            send_to_char(ch, " (Social Edit)");
          if (d->connected == CON_CEDIT)
-@@ -2733,3 +2796,18 @@
+@@ -2008,6 +2071,9 @@
+     {"verbose", PRF_VERBOSE, LVL_IMMORT,
+       "You will no longer see verbose output in listings.\n",
+       "You will now see verbose listings.\n"},
++    {"autosell", PRF_AUTOSELL, 0,
++    "Autosell shop items disabled.\r\n",
++    "Autosell shop items enabled.\r\n"},	  
+     {"\n", 0, -1, "\n", "\n"} /* must be last */
+   };
+ 
+@@ -2096,7 +2162,10 @@
+ 
+     "        Autokey: %-3s    "
+     "       Autodoor: %-3s    "
+-    "          Color: %s     \r\n ",
++    "          Color: %s     \r\n "
++	
++	"       Autosell: %-3s\r\n"	,
++	
+ 
+     ONOFF(PRF_FLAGGED(ch, PRF_DISPHP)),
+     ONOFF(PRF_FLAGGED(ch, PRF_BRIEF)),
+@@ -2132,7 +2201,9 @@
+ 
+     ONOFF(PRF_FLAGGED(ch, PRF_AUTOKEY)),
+     ONOFF(PRF_FLAGGED(ch, PRF_AUTODOOR)),
+-    types[COLOR_LEV(ch)]);
++    types[COLOR_LEV(ch)],
++	
++    ONOFF(PRF_FLAGGED(ch, PRF_AUTOSELL)));	
+     return;
+   }
+ 
+@@ -2733,3 +2804,18 @@
      send_to_char(ch, "You don't see anything nearby!\r\n");
    }
  } // end of do_scan
