@@ -1,0 +1,4030 @@
+diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.c
+--- tbamudmaster/src/act.informative.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/act.informative.c	2026-02-07 13:46:50.454084400 -0600
+@@ -28,6 +28,7 @@
+ #include "modify.h"
+ #include "asciimap.h"
+ #include "quest.h"
++#include "assemblies.h"
+ 
+ /* prototypes of local functions */
+ /* do_diagnose utility functions */
+@@ -58,7 +59,7 @@
+ 
+ static void show_obj_to_char(struct obj_data *obj, struct char_data *ch, int mode)
+ {
+-  int found = 0;
++  int found = 0, percent;
+   struct char_data *temp;
+ 
+   if (!obj || !ch) {
+@@ -146,6 +147,20 @@
+      *  what mode was passed to it.  To correct it, you will need to find the
+      *  call with the incorrect mode and change it to an acceptable mode. */
+     return;
++	
++	if (GET_OBJ_TYPE(obj) == ITEM_TOOL){
++		if  (GET_OBJ_VAL(obj, 3) > 0)
++		  percent = (int)((float)GET_OBJ_VAL(obj, 2) / GET_OBJ_VAL(obj, 3) * 100);
++		 else percent = 0;
++	  
++	   if (percent == 0)	send_to_char(ch, " \ty(\trbroken\ty)\tn");
++  else if (percent <= 10)	send_to_char(ch, " \ty(\tr*     \ty)\tn");
++  else if (percent <= 25)   send_to_char(ch, " \ty(\tY**    \ty)\tn");
++  else if (percent <= 50)   send_to_char(ch, " \ty(\tg***   \ty)\tn");
++  else if (percent <= 75)   send_to_char(ch, " \ty(\tg****  \ty)\tn");
++  else if (percent <= 90)   send_to_char(ch, " \ty(\tg***** \ty)\tn");
++  else			            send_to_char(ch, " \ty(\tG******\ty)\tn");
++} 	
+   }
+   end:
+ 
+@@ -277,6 +292,13 @@
+         show_obj_to_char(GET_EQ(i, j), ch, SHOW_OBJ_SHORT);
+       }
+   }
++  
++   for (j = 0; j < MAX_TOOLS; j++)
++    if (GET_TOOL(i, j) && CAN_SEE_OBJ(ch, GET_TOOL(i, j))) {
++	send_to_char(ch, "On toolbelt: ");
++	show_obj_to_char(GET_TOOL(i, j), ch, 1);
++	} 
++	
+   if (ch != i && (IS_THIEF(ch) || GET_LEVEL(ch) >= LVL_IMMORT)) {
+     act("\r\nYou attempt to peek at $s inventory:", FALSE, i, 0, ch, TO_VICT);
+     list_obj_to_char(i->carrying, ch, SHOW_OBJ_SHORT, TRUE);
+@@ -489,7 +511,9 @@
+   trig_data * t;
+   struct room_data *rm = &world[IN_ROOM(ch)];
+   room_vnum target_room;
+-
++  int j_num, i;
++  char buf2[MAX_STRING_LENGTH];  
++  
+   target_room = IN_ROOM(ch);
+ 
+   if (!ch->desc)
+@@ -518,6 +542,10 @@
+         send_to_char(ch, " %d", GET_TRIG_VNUM(t));
+       send_to_char(ch, "]");
+     }
++  send_to_char(ch, "\r\n  Vals: "); 
++        for (i = 0; i < NUM_ROOM_VAL_POSITIONS; i++) {
++	  send_to_char(ch, "[%d] ", world[IN_ROOM(ch)].roomval[i]);
++		}
+   }
+   else
+     send_to_char(ch, "%s", world[IN_ROOM(ch)].name);
+@@ -537,6 +565,27 @@
+   if (!IS_NPC(ch) && PRF_FLAGGED(ch, PRF_AUTOEXIT))
+     do_auto_exits(ch);
+ 
++ if (world[IN_ROOM(ch)].sector_type == SECT_FOREST  || world[IN_ROOM(ch)].sector_type == SECT_FIELD) {
++ 	if (world[IN_ROOM(ch)].roomval[0] > 0 && world[IN_ROOM(ch)].resource_name != NULL) {
++		prune_crlf(strncpy(buf2, world[IN_ROOM(ch)].resource_name, MAX_STRING_LENGTH - 1));
++		send_to_char(ch, "\tC%s %s is ",
++		world[IN_ROOM(ch)].roomval[1] != GET_IDNUM(ch) ? (world[IN_ROOM(ch)].roomval[1] > 0 ? "Someones" : "A") : "Your", \
++		buf2);	 
++				if (world[IN_ROOM(ch)].roomval[3] <= obj_proto[real_object(world[IN_ROOM(ch)].roomval[0])].obj_flags.value[3])
++		   		send_to_char(ch, "growing here.\tn\r\n");
++				else
++		   		send_to_char(ch, "ready for harvesting.\tn\r\n");			
++	   }		
++  }
++  
++ if (world[IN_ROOM(ch)].sector_type == SECT_MINESHAFT) {
++	j_num = world[IN_ROOM(ch)].roomval[0];	 
++ 	if (world[IN_ROOM(ch)].roomval[0] > 0 && world[IN_ROOM(ch)].roomval[2] > 0 && world[IN_ROOM(ch)].resource_name != NULL) {
++		prune_crlf(strncpy(buf2, world[IN_ROOM(ch)].resource_name, MAX_STRING_LENGTH - 1));
++      send_to_char(ch, "\tCA vein producing %s is here.\tn\r\n", buf2);
++	}
++	   }
++
+   /*now list characters &objects */
+   list_obj_to_char(world[IN_ROOM(ch)].contents, ch, SHOW_OBJ_LONG, FALSE);
+   list_char_to_char(world[IN_ROOM(ch)].people, ch);
+@@ -971,6 +1020,18 @@
+   }
+   if (!found)
+     send_to_char(ch, " Nothing.\r\n");
++
++  send_to_char(ch, "\r\n");
++  for (i = 0; i < MAX_TOOLS; i++) {
++	      if (GET_TOOL(ch, i)) {
++      if (CAN_SEE_OBJ(ch, GET_TOOL(ch, i))) {
++		    send_to_char(ch, "Toolbelt: ");  
++	show_obj_to_char(GET_TOOL(ch, i), ch, SHOW_OBJ_SHORT);
++      } else {
++	send_to_char(ch, "Something.\r\n");
++      }
++    }
++  }
+ }
+ 
+ ACMD(do_time)
+@@ -1319,6 +1380,8 @@
+           send_to_char(ch, " (Text Edit)");
+         if (d->connected == CON_TRIGEDIT)
+           send_to_char(ch, " (Trigger Edit)");
++        if (STATE(d) == CON_ASSEDIT)
++          send_to_char(ch, " `C(`WOLC assembly`C)`n");	  
+         if (d->connected == CON_AEDIT)
+           send_to_char(ch, " (Social Edit)");
+         if (d->connected == CON_CEDIT)
+diff -ruN tbamudmaster/src/assedit.c tbamudmasterad/src/assedit.c
+--- tbamudmaster/src/assedit.c	1969-12-31 18:00:00.000000000 -0600
++++ tbamudmasterad/src/assedit.c	2026-02-06 22:18:55.644354900 -0600
+@@ -0,0 +1,557 @@
++/* ******************************************************************** *
++ * FILE : assedit.c                     Copyright (C) 1999 Del Minturn  *
++ * USAGE: Olc for assembly engine by Geoff Davis.                       *
++ *        Oasis OLC by George Greer.
++ * -------------------------------------------------------------------- *
++ * 1999 July 25 caminturn@earthlink.net             		        *
++ * ******************************************************************** */
++
++#include "conf.h"
++#include "sysdep.h"
++#include "structs.h"
++#include "utils.h"
++
++#include "db.h"
++#include "comm.h"
++#include "handler.h"
++#include "interpreter.h"
++#include "oasis.h"
++#include "genolc.h"
++#include "constants.h"
++#include "assemblies.h"
++
++/*-------------------------------------------------------------------*
++ * External data structures.
++ *-------------------------------------------------------------------*/
++extern struct descriptor_data *descriptor_list;
++extern struct obj_data *obj_proto;
++
++extern const char *AssemblyTypes[];
++
++/*-------------------------------------------------------------------*
++ * Function prototypes.
++ *-------------------------------------------------------------------*/
++void assedit_setup(struct descriptor_data *d, int number);
++void assedit_disp_menu(struct descriptor_data *d);
++void assedit_delete(struct descriptor_data *d);
++void assedit_edit_extract(struct descriptor_data *d);
++void assedit_edit_inroom(struct descriptor_data *d);
++void assedit_edit_component_chow_many(struct descriptor_data *d);
++void nodigit(struct descriptor_data *d);
++
++
++/*-------------------------------------------------------------------*
++ * Nasty internal macros to clean up the code.
++ *-------------------------------------------------------------------*/
++obj_rnum lRnum = 0;
++
++
++/*-------------------------------------------------------------------*
++ * Assedit command
++ *-------------------------------------------------------------------*/
++
++ACMD (do_assedit)
++{
++ char buf[MAX_INPUT_LENGTH], buf2[MAX_INPUT_LENGTH];
++  struct descriptor_data *d = ch->desc;
++
++
++
++ if (IS_NPC(ch))
++      return;
++ if (GET_LEVEL(ch) < LVL_IMPL)
++     send_to_char(ch, "You do not have permission to do that.\r\n");
++
++ for (d = descriptor_list; d; d = d->next) {
++     if (d->connected == CON_ASSEDIT) {
++     send_to_char(ch, "Assemblies are already being editted by someone.\r\n");
++     return;
++     }
++   }
++
++ two_arguments(argument, buf, buf2);
++
++ d= ch->desc;
++ 
++ if(!*buf) {
++    nodigit(d);
++    return;
++    }
++
++ if (!isdigit(*buf)) {
++    if (strn_cmp("new", buf, 3) == 0) {
++         if(!isdigit(*buf2))
++            nodigit(d);
++		 else if(real_object(atoi(buf2)) == NOTHING) {
++			send_to_char(d->character, "%sThat object does not exist.%s\r\n", yel, nrm);
++			return;
++		 } else {
++            assemblyCreate(atoi(buf2), 0, 0, 0, 1, -1);
++            send_to_char(d->character, "Assembly Created.\r\n");
++            assemblySaveAssemblies();
++            return;
++            }
++       }
++    else
++    if (strn_cmp("delete", buf, 6) == 0) {
++         if (!isdigit(*buf2))
++            nodigit(d);
++         else {
++             assemblyDestroy(atoi(buf2));
++             send_to_char(d->character, "Assembly Deleted.\r\n");
++             assemblySaveAssemblies();
++             return;
++             }
++      }
++    else {
++     nodigit(d);
++     return;
++     }
++ } else 
++   if (isdigit(*buf)) {
++     d = ch->desc;
++     CREATE (d->olc, struct oasis_olc_data, 1);
++     assedit_setup(d, atoi(buf));
++
++     }
++return;
++}
++
++/*-------------------------------------------------------------------*
++ * Assedit Functions
++ *-------------------------------------------------------------------*/
++
++void assedit_setup(struct descriptor_data *d, int number)
++{
++
++    ASSEMBLY    *pOldAssembly = NULL;
++    CREATE(OLC_ASSEDIT(d), ASSEMBLY, 1 );
++
++
++    if( (pOldAssembly = assemblyGetAssemblyPtr( number )) == NULL ) {
++      send_to_char(d->character, "That assembly does not exist\r\n");
++      cleanup_olc(d, CLEANUP_ALL);
++      return;
++    } else {
++        /* Copy the old assembly. */
++        OLC_ASSEDIT(d)->lVnum = pOldAssembly->lVnum;
++        OLC_ASSEDIT(d)->uchAssemblyType = pOldAssembly->uchAssemblyType;
++        OLC_ASSEDIT(d)->lNumComponents = pOldAssembly->lNumComponents;
++        OLC_ASSEDIT(d)->level_to_make = pOldAssembly->level_to_make;
++        OLC_ASSEDIT(d)->exp_given = pOldAssembly->exp_given;
++        OLC_ASSEDIT(d)->how_many = pOldAssembly->how_many;
++        OLC_ASSEDIT(d)->tool_type = pOldAssembly->tool_type;
++		
++        if( OLC_ASSEDIT(d)->lNumComponents > 0 )  {
++            CREATE(OLC_ASSEDIT(d)->pComponents, COMPONENT, OLC_ASSEDIT(d)->lNumComponents);
++            memmove(OLC_ASSEDIT(d)->pComponents, pOldAssembly->pComponents,
++            OLC_ASSEDIT(d)->lNumComponents * sizeof( COMPONENT ) );
++           }
++    
++    }
++
++    /*
++     * At this point, pNewAssembly is now the address of a freshly allocated copy of all
++     * the data contained in the original assembly structure.
++     */
++
++
++    if ( (lRnum = real_object( OLC_ASSEDIT(d)->lVnum ) ) < 0)
++      {
++       send_to_char(d->character, " Assembled item may not exist, check the vnum and assembles (show assemblies). \r\n");
++       cleanup_olc(d, CLEANUP_ALL);    /* for right now we just get out! */
++       return;
++      }
++
++ STATE(d) = CON_ASSEDIT;
++ act("$n twists time and space, while stepping into another dimension.", TRUE, d->character, 0, 0, TO_ROOM);
++ SET_BIT_AR(PLR_FLAGS(d->character), PLR_WRITING);
++ assedit_disp_menu(d);
++
++}
++
++void assedit_disp_menu(struct descriptor_data *d)
++{
++ int i = 0;
++ extern const char *AssemblyTypes[];
++ char           szAssmType[ MAX_INPUT_LENGTH ] = { '\0' };
++
++ get_char_colors(d->character);
++
++ sprinttype( OLC_ASSEDIT(d)->uchAssemblyType, AssemblyTypes, szAssmType, sizeof(szAssmType));
++
++#if defined(CLEAR_SCREEN)
++send_to_char(d->character, "%c[H%c[J", 27, 27);
++#endif
++
++  send_to_char(d->character, 
++      "Assembly Number:%s %d %s\r\n"
++      "Assembly Name  :%s %s %s \r\n"
++	  "Reward Amount  :%s %d %s \r\n"
++      "Assembly Type  :%s %s %s\r\n"
++      "Level to make  :%s %d %s\r\n"
++      "Experience     :%s %d %s\r\n"
++	  "Requires a tool:%s %s %s\r\n"
++      "Components:\r\n",
++        yel,  OLC_ASSEDIT(d)->lVnum, nrm,
++        yel,  obj_proto[ real_object(OLC_ASSEDIT(d)->lVnum) ].short_description, nrm,
++        yel,  OLC_ASSEDIT(d)->how_many, nrm,		
++        yel,  szAssmType, nrm,
++        yel,  OLC_ASSEDIT(d)->level_to_make, nrm,
++        yel,  OLC_ASSEDIT(d)->exp_given, nrm,
++		yel,  (OLC_ASSEDIT(d)->tool_type > -1 ? tool_types[OLC_ASSEDIT(d)->tool_type] : "No"), nrm
++		  );
++  
++  if(OLC_ASSEDIT(d)->lNumComponents <= 0)
++    send_to_char(d->character, "   < NONE > \r\n");
++  else {
++   for( i = 0; i < OLC_ASSEDIT(d)->lNumComponents; i++ ) {
++     if ( (lRnum = real_object(OLC_ASSEDIT(d)->pComponents[i].lVnum)) < 0)
++       {
++        send_to_char(d->character,
++          "%s %d%s) %s ERROR --- Contact an Implimentor %s\r\n ",
++           grn, i+1, nrm, yel, nrm
++            );
++       }  else   {
++        send_to_char(d->character, 
++          "%s %d%s) [%5d] %-20.20s  How Many: %d  In room:%s %-3.3s %s   Extract:%s %-3.3s%s \r\n",
++           grn,  i+1, nrm,
++           OLC_ASSEDIT(d)->pComponents[i].lVnum,
++           obj_proto[ lRnum ].short_description,
++		   OLC_ASSEDIT(d)->pComponents[i].chow_many,
++           yel, (OLC_ASSEDIT(d)->pComponents[ i ].bInRoom  ? "Yes" : "No"), nrm,
++           yel, (OLC_ASSEDIT(d)->pComponents[ i ].bExtract ? "Yes" : "No"), nrm
++           );
++       }
++      }
++     }
++  send_to_char(d->character, 
++       "%sA%s) Add a new component.\r\n"
++       "%sE%s) Edit a component.\r\n"
++       "%sD%s) Delete a component.\r\n"
++	   "%sY%s) Change Assembly Reward Amount.\r\n"
++       "%sT%s) Change Assembly Type.\r\n"
++       "%sL%s) Change Assembly Level.\r\n"
++       "%sX%s) Change Assembly Experience.\r\n"
++	   "%sW%s) Change Assembly Tool type.\r\n"
++       "%sQ%s) Quit.\r\n"
++       "\r\nEnter your choice : ",
++       grn, nrm, grn, nrm, grn, nrm, grn, nrm, grn, nrm, grn, nrm, grn, nrm, grn, nrm, grn, nrm
++         );
++
++  OLC_MODE(d) = ASSEDIT_MAIN_MENU;
++
++return;
++}
++
++/***************************************************
++   Command Parse
++ ***************************************************/
++
++void assedit_parse(struct descriptor_data *d, char *arg)
++{
++ int i = 0, counter, columns = 0;
++ obj_vnum pos = 0;
++ 
++   COMPONENT	*pTComponents = NULL;
++
++ switch (OLC_MODE(d)) {
++
++   case ASSEDIT_MAIN_MENU:
++     switch (*arg) {
++     case 'q':
++     case 'Q':                /* do the quit stuff */
++       /* Ok, Time to save it back to the original stuff and get out */
++       /* due to the infrequent use of this code and restricted use  */
++       /* I decided to copy over changes regarless.                  */
++       assemblyDestroy(OLC_ASSEDIT(d)->lVnum);
++       assemblyCreate(OLC_ASSEDIT(d)->lVnum, OLC_ASSEDIT(d)->uchAssemblyType, OLC_ASSEDIT(d)->level_to_make, OLC_ASSEDIT(d)->exp_given, OLC_ASSEDIT(d)->how_many, OLC_ASSEDIT(d)->tool_type);
++       for( i = 0; i < OLC_ASSEDIT(d)->lNumComponents; i++) {
++           assemblyAddComponent(OLC_ASSEDIT(d)->lVnum,
++                                OLC_ASSEDIT(d)->pComponents[i].lVnum,
++                                OLC_ASSEDIT(d)->pComponents[i].bExtract,
++                                OLC_ASSEDIT(d)->pComponents[i].bInRoom,
++                                OLC_ASSEDIT(d)->pComponents[i].chow_many								
++                                );
++            }
++       send_to_char(d->character, "\r\nSaving all assemblies\r\n");
++       assemblySaveAssemblies();
++
++/*       free(pTComponents);
++       free(OLC_ASSEDIT(d));
++*/
++       cleanup_olc(d, CLEANUP_ALL);    /* for right now we just get out! */
++      break;
++
++     case 't':
++     case 'T':
++         get_char_colors(d->character);
++#if defined(CLEAR_SCREEN)  
++send_to_char(d->character, "%c[H%c[J", 27, 27);
++#endif
++      for (counter = 0; counter < MAX_ASSM; counter++) {
++           send_to_char(d->character, "%s%2d%s) %-20.20s %s", grn, counter + 1, nrm,
++                AssemblyTypes[counter], !(++columns % 2) ? "\r\n" : "");
++           }
++           send_to_char(d->character, "Enter the assembly type : ");
++     OLC_MODE(d) = ASSEDIT_EDIT_TYPES;
++
++     break;
++     case 'a':
++     case 'A':                /* add a new component */
++       send_to_char(d->character, "\r\nWhat is the vnum of the new component? ");
++       OLC_MODE(d) = ASSEDIT_ADD_COMPONENT;
++      break;
++
++     case 'e':
++     case 'E':                /* edit a component */
++       send_to_char(d->character, "\r\nEdit which component? ");
++       OLC_MODE(d) = ASSEDIT_EDIT_COMPONENT;
++      break;
++     case 'd':
++     case 'D':                /* delete a component */
++       if ((pos < 0) || pos > OLC_ASSEDIT(d)->lNumComponents) {
++           send_to_char(d->character, "\r\nWhich component do you wish to remove? ");
++           assedit_disp_menu(d);
++       } else {
++           send_to_char(d->character, "\r\nWhich component do you wish to remove? ");
++           OLC_MODE(d) = ASSEDIT_DELETE_COMPONENT;
++       }
++      break;
++     case 'l':
++     case 'L':                /* change level */
++       send_to_char(d->character, "\r\nWhat is the new level at which it can be made? ");
++       OLC_MODE(d) = ASSEDIT_EDIT_LEVEL;
++      break;
++	  
++     case 'w':
++     case 'W':                /* change level */
++	 counter = 0;
++	 send_to_char(d->character, "\n");
++         for (i=0; i<MAX_TOOLS; i++){
++		  send_to_char(d->character, "`y%2d`n): `c%-15.15s`n     ", i, tool_types[i]);
++		  counter++;
++		  if (counter > 3) {
++			send_to_char(d->character, "\n");
++			counter = 0;
++		  }			
++	}	 
++       send_to_char(d->character, "\r\nWhat is the tool needed? -1 for none.");
++       OLC_MODE(d) = ASSEDIT_EDIT_TOOL;
++      break;
++	  
++     case 'x':
++     case 'X':                /* change level */
++       send_to_char(d->character, "\r\nWhat is the new experience given when made? ");
++       OLC_MODE(d) = ASSEDIT_EDIT_EXP;
++      break;
++	  
++     case 'y':
++     case 'Y':                /* change level */
++       send_to_char(d->character, "\r\nHow many should be given when made? ");
++       OLC_MODE(d) = ASSEDIT_EDIT_RA;
++      break;	  
++
++     default:
++       assedit_disp_menu(d);
++    }
++   break;
++
++
++  case ASSEDIT_EDIT_TYPES:
++   if (isdigit(*arg)){
++    pos = atoi(arg) - 1;
++     if( (pos >= 0) || (pos < MAX_ASSM)) {
++           OLC_ASSEDIT(d)->uchAssemblyType = pos;
++     assedit_disp_menu(d);
++     break;
++    }
++   }
++   else
++   assedit_disp_menu(d);  
++
++ break;
++ case ASSEDIT_ADD_COMPONENT:              /* add a new component */
++   if (isdigit(*arg)){
++      pos = atoi(arg);
++     if ((real_object(pos)) == NOTHING) {   /* does the object exist? */
++       send_to_char(d->character, "\r\n`RThat object doesnt exist.`n\r\n ");
++       assedit_disp_menu(d); 
++	   break;
++	 }
++     for ( i = 0; i < OLC_ASSEDIT(d)->lNumComponents; i++) {
++        if(OLC_ASSEDIT(d)->pComponents[i].lVnum == pos)
++          break;
++       }
++
++     CREATE( pTComponents, COMPONENT, OLC_ASSEDIT(d)->lNumComponents + 1);
++
++     if(OLC_ASSEDIT(d)->pComponents != NULL) {          /* Copy from olc to temp */
++        memmove(pTComponents, OLC_ASSEDIT(d)->pComponents,
++                  OLC_ASSEDIT(d)->lNumComponents * sizeof(COMPONENT) );
++        free(OLC_ASSEDIT(d)->pComponents);
++       }
++
++     OLC_ASSEDIT(d)->pComponents = pTComponents;
++     OLC_ASSEDIT(d)->pComponents[ OLC_ASSEDIT(d)->lNumComponents ].lVnum = pos;
++     OLC_ASSEDIT(d)->pComponents[ OLC_ASSEDIT(d)->lNumComponents ].bExtract = YES;
++     OLC_ASSEDIT(d)->pComponents[ OLC_ASSEDIT(d)->lNumComponents ].bInRoom = NO;
++	 OLC_ASSEDIT(d)->pComponents[ OLC_ASSEDIT(d)->lNumComponents ].chow_many = 1;
++     OLC_ASSEDIT(d)->lNumComponents += 1;
++
++     assedit_disp_menu(d);     
++
++   } else {
++     send_to_char(d->character, "That object does not exist, Please try again\r\n");
++     assedit_disp_menu(d);
++     }
++  break;
++
++ case ASSEDIT_EDIT_COMPONENT:
++   pos = atoi(arg);
++   if (isdigit(*arg)) {
++      pos--;
++      OLC_VAL(d) = pos;
++      assedit_edit_component_chow_many(d);
++      break;
++    }
++   else
++      assedit_disp_menu(d);
++   break;
++
++ case ASSEDIT_DELETE_COMPONENT:
++
++  if (isdigit(*arg)) {
++    pos = atoi(arg);
++    pos -= 1;
++
++    CREATE( pTComponents, COMPONENT, OLC_ASSEDIT(d)->lNumComponents -1);
++
++    if( pos > 0 )
++      memmove( pTComponents, OLC_ASSEDIT(d)->pComponents, pos * sizeof( COMPONENT ) );
++
++    if( pos < OLC_ASSEDIT(d)->lNumComponents - 1 )
++       memmove( pTComponents + pos, OLC_ASSEDIT(d)->pComponents + pos + 1, 
++            (OLC_ASSEDIT(d)->lNumComponents - pos - 1) * sizeof(COMPONENT) );
++
++    free(OLC_ASSEDIT(d)->pComponents );
++    OLC_ASSEDIT(d)->pComponents = pTComponents;
++    OLC_ASSEDIT(d)->lNumComponents -= 1;
++
++    assedit_disp_menu(d);
++    break;
++  } else
++    assedit_disp_menu(d);
++  break;
++
++ case ASSEDIT_EDIT_EXTRACT:
++  switch (*arg) {
++    case 'y':
++    case 'Y':
++      OLC_ASSEDIT(d)->pComponents[ OLC_VAL(d) ].bExtract = TRUE;
++      assedit_edit_inroom(d);
++    break; 
++
++    case 'n':
++    case 'N':
++      OLC_ASSEDIT(d)->pComponents[ OLC_VAL(d) ].bExtract = FALSE;
++      assedit_edit_inroom(d);
++    break;
++ 
++    default:
++      send_to_char(d->character, "Is the item to be extracted when the assembly is created? (Y/N) ");
++    break;
++    }
++   break;
++ case ASSEDIT_EDIT_INROOM:
++  switch (*arg) {
++    case 'y':
++    case 'Y':
++      OLC_ASSEDIT(d)->pComponents[ OLC_VAL(d) ].bInRoom = TRUE;
++      assedit_disp_menu(d);
++    break;
++
++    case 'n':
++    case 'N':
++      OLC_ASSEDIT(d)->pComponents[ OLC_VAL(d) ].bInRoom = FALSE;
++      assedit_disp_menu(d);
++    break;
++
++    default:
++      send_to_char(d->character, "Object in the room when assembly is created? (n =  in inventory) : ");
++    break;
++    }
++ break;
++
++  case ASSEDIT_EDIT_LEVEL:
++           OLC_ASSEDIT(d)->level_to_make = LIMIT(atoi(arg), 0, 100);
++     assedit_disp_menu(d);
++     break;
++
++  case ASSEDIT_EDIT_EXP:
++           OLC_ASSEDIT(d)->exp_given = LIMIT(atoi(arg), 0, 100);
++     assedit_disp_menu(d);
++     break;
++	 
++  case ASSEDIT_EDIT_RA:
++           OLC_ASSEDIT(d)->how_many = LIMIT(atoi(arg), 0, 10);
++     assedit_disp_menu(d);
++     break;	
++
++   case ASSEDIT_EDIT_CA:
++           OLC_ASSEDIT(d)->pComponents[ OLC_VAL(d) ].chow_many = LIMIT(atoi(arg), 0, 10);
++     assedit_edit_extract(d);
++     break;
++	 
++
++   case ASSEDIT_EDIT_TOOL:
++           OLC_ASSEDIT(d)->tool_type = LIMIT(atoi(arg), -1, MAX_TOOLS - 1);
++     assedit_disp_menu(d);
++     break;	
++
++ default:                        /* default for whole assedit parse function */
++                                 /* we should never get here */
++ mudlog(BRF, LVL_GOD, TRUE, "SYSERR: OLC assedit_parse(): Reached default case!");
++ send_to_char(d->character, "Opps...\r\n");
++ STATE(d) = CON_PLAYING;
++ break;
++ }
++}
++/* End of Assedit Parse */
++
++void assedit_delete(struct descriptor_data *d)
++{
++ send_to_char(d->character, "Which item number do you wish to delete from this assembly? ");
++ OLC_MODE(d) = ASSEDIT_DELETE_COMPONENT;
++ return;
++}
++
++
++void assedit_edit_extract(struct descriptor_data *d)
++{
++ send_to_char(d->character, "Is the item to be extracted when the assembly is created? (Y/N) : ");
++ OLC_MODE(d) = ASSEDIT_EDIT_EXTRACT;
++ return;
++}
++
++void assedit_edit_inroom(struct descriptor_data *d)
++{
++ send_to_char(d->character, "Should the object be in the room when assembly is created (n =  in inventory)? ");
++ OLC_MODE(d) = ASSEDIT_EDIT_INROOM;
++ return;
++}
++
++void assedit_edit_component_chow_many(struct descriptor_data *d)
++{
++ send_to_char(d->character, "How many of this item are needed? ");
++ OLC_MODE(d) = ASSEDIT_EDIT_CA;
++ return;
++}
++
++void nodigit(struct descriptor_data *d)
++{
++  send_to_char(d->character, "Usage: assedit <vnum>\r\n");
++  send_to_char(d->character, "     : assedit new <vnum>\r\n");
++  send_to_char(d->character, "     : assedit delete <vnum>\r\n");
++  return;
++}
+diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
+--- tbamudmaster/src/assemblies.c	1969-12-31 18:00:00.000000000 -0600
++++ tbamudmasterad/src/assemblies.c	2026-02-06 22:59:52.177981100 -0600
+@@ -0,0 +1,2554 @@
++/* ******************************************************************** *
++ * FILE	: assemblies.c     				Copyright (C) 1999 Geoff Davis	*
++ * USAGE: Implementation for assembly engine.							*
++ * -------------------------------------------------------------------- *
++ * 1999 MAY 07	gdavis/azrael@laker.net	Initial implementation.			* 
++ * fishing originally by kaan@dibrova.org								*
++ * ******************************************************************** */
++
++#define __ASSEMBLIES_C__
++
++#include "conf.h"
++#include "sysdep.h"
++#include "structs.h"
++#include "utils.h"
++
++#include "assemblies.h"
++#include "comm.h"
++#include "constants.h"
++#include "db.h"
++#include "handler.h"
++#include "interpreter.h"
++#include "shop.h"
++
++/* Local global variables. */
++long		g_lNumAssemblies = 0;
++ASSEMBLY	*g_pAssemblyTable = NULL;
++
++/* only need this for the random stuff */
++int numswfish;
++int numfwfish;
++int numores;
++int numseeds;
++
++/* External global variables. */
++extern struct obj_data *obj_proto;
++extern struct room_data *world;
++
++static int count_craft_items(struct char_data *ch, obj_vnum vnum, bool room)
++{
++int numitems = 0;
++struct obj_data *obj;
++
++    if(room == TRUE)
++    {
++     for (obj = world[IN_ROOM(ch)].contents; obj; obj = obj->next_content)
++		if (GET_OBJ_VNUM(obj) == vnum && CAN_SEE_OBJ(ch, obj))
++			numitems++;
++	} else {
++		
++	for (obj = ch->carrying; obj; obj = obj->next_content)
++		if (GET_OBJ_VNUM(obj) == vnum && CAN_SEE_OBJ(ch, obj))
++			numitems++;
++}
++return (numitems);
++}
++
++void add_crafting_exp(struct char_data *ch, int exp, int type)
++      {
++		  int i, dexp;
++
++		 if (exp <= 0 || ch == NULL || IS_NPC(ch))
++             return;
++
++		 if ((ch)->player_specials->saved.crafting_level[type] == 100)	{	 
++		//	 gain_exp(ch, exp*100);
++		//	 send_to_char(ch, "`n\r\n");
++			 return;
++		 }
++		 
++   dexp = exp;
++
++// happy hour stuff
++//   if (GET_DEXP(ch) > 0)
++//     dexp = exp*2;
++
++//   dexp = MIN(10000, MAX(1, dexp));
++
++ 
++	 send_to_char(ch, "You gain `w%d`n experience in `g%s.`n\r\n", dexp, CraftingTypes[type]);
++		   for (i = dexp; i;  i--) {
++		  if((ch)->player_specials->saved.crafting_level[type] == 100 || i == 0)
++			  break;
++		  (ch)->player_specials->saved.crafting_exp[type] += 1;
++
++		   if ((ch)->player_specials->saved.crafting_exp[type] >= (((ch)->player_specials->saved.crafting_level[type]+1) * 1000)){
++           (ch)->player_specials->saved.crafting_exp[type] = 0;
++           (ch)->player_specials->saved.crafting_level[type] += 1;
++		send_to_char(ch, "`cCongrats! You have advanced a %s level.`n\r\n", CraftingTypes[type]);
++//		mortchan(ch, "%s has advanced in %s to level %d.\r\n", GET_NAME(ch), 
++//             CraftingTypes[type], (ch)->player_specials->saved.crafting_level[type]);
++		     }
++		  }
++      }
++	  
++
++void assemblyBootAssemblies( void )
++{
++  char		szLine[ MAX_STRING_LENGTH ] = { '\0' };
++  char		szTag[ MAX_STRING_LENGTH ] = { '\0' };
++  char		szType[ MAX_STRING_LENGTH ] = { '\0' };
++  int		iExtract = 0;
++  int		iInRoom = 0;
++  int		iType = 0;
++  int		ihow_many = 0;  
++  long		lLineCount = 0;
++  int		lPartVnum = NOTHING;
++  int		lVnum = NOTHING;
++  int		level_to_make = 0;
++  int		exp_given = 0;
++  int		tool_type = -1;  
++  FILE		*pFile = NULL;
++
++  if( (pFile = fopen( ASSEMBLIES_FILE, "rt" )) == NULL )
++  {
++    log( "SYSERR: assemblyBootAssemblies(): Couldn't open file '%s' for "
++      "reading.", ASSEMBLIES_FILE );
++    return;
++  }
++
++  while( !feof( pFile ) )
++  {
++    lLineCount += get_line( pFile, szLine );
++    half_chop( szLine, szTag, szLine );
++
++    if( *szTag == '\0' )
++      continue;
++
++    if( str_cmp( szTag, "Component" ) == 0 )
++    {
++      if( sscanf( szLine, "#%d %d %d %d", &lPartVnum, &iExtract, &iInRoom, &ihow_many ) != 4 )
++		ihow_many = 1;  
++	  if( sscanf( szLine, "#%d %d %d", &lPartVnum, &iExtract, &iInRoom ) != 3 )
++      {
++	log( "SYSERR: bootAssemblies(): Invalid format in file %s, line %ld: "
++	  "szTag=%s, szLine=%s.", ASSEMBLIES_FILE, lLineCount, szTag, szLine );
++      }
++      else if( !assemblyAddComponent( lVnum, lPartVnum, iExtract, iInRoom, ihow_many ) )
++      {
++	log( "SYSERR: bootAssemblies(): Could not add component #%d to "
++	  "assembly #%d.", lPartVnum, lVnum );
++      }
++	}
++    else if( str_cmp( szTag, "Vnum" ) == 0 )
++    {
++      if( sscanf( szLine, "#%d %s %d %d %d %d", &lVnum, szType, &level_to_make, &exp_given, &ihow_many, &tool_type ) != 6 )
++        tool_type = -1;	
++      if( sscanf( szLine, "#%d %s %d %d %d", &lVnum, szType, &level_to_make, &exp_given, &ihow_many ) != 5 )
++		ihow_many = 1;  		  
++      if( sscanf( szLine, "#%d %s %d %d", &lVnum, szType, &level_to_make, &exp_given ) != 4 )
++      {
++	log( "SYSERR: bootAssemblies(): Invalid format in file %s, "
++	  "line %ld.", ASSEMBLIES_FILE, lLineCount );
++	lVnum = NOTHING;
++      }
++    else if( (iType = search_block( szType, AssemblyTypes, TRUE )) < 0 )
++      {
++	  log( "SYSERR: bootAssemblies(): Invalid type '%s' for assembly "
++	  "vnum #%d at line %ld.", szType, lVnum, lLineCount );
++	  lVnum = NOTHING;
++    }
++    else if( !assemblyCreate( lVnum, iType, level_to_make, exp_given, ihow_many, tool_type ) )
++      {
++	log( "SYSERR: bootAssemblies(): Could not create assembly for vnum "
++	  "#%d, type %s.", lVnum, szType );
++	lVnum = NOTHING;
++      }	
++	}
++     else
++    {
++      log( "SYSERR: Invalid tag '%s' in file %s, line #%ld.", szTag,
++	ASSEMBLIES_FILE, lLineCount );
++    }
++
++    *szLine = '\0';
++    *szTag = '\0';
++  }
++
++  fclose( pFile );
++}
++
++void assemblySaveAssemblies( void )
++{
++  char		szType[ MAX_STRING_LENGTH ] = { '\0' };
++  long		i = 0;
++  long		j = 0;
++  ASSEMBLY	*pAssembly = NULL;
++  FILE		*pFile = NULL;
++
++  if( (pFile = fopen( ASSEMBLIES_FILE, "wt" )) == NULL )
++  {
++    log( "SYSERR: assemblySaveAssemblies(): Couldn't open file '%s' for "
++      "writing.", ASSEMBLIES_FILE );
++    return;
++  }
++
++  for( i = 0; i < g_lNumAssemblies; i++)
++  {
++    pAssembly = (g_pAssemblyTable + i);
++    sprinttype( pAssembly->uchAssemblyType, AssemblyTypes, szType, sizeof(szType));
++    fprintf( pFile, "Vnum                #%d %s %d %d %d %d\n", pAssembly->lVnum, szType,
++		     pAssembly->level_to_make, pAssembly->exp_given, pAssembly->how_many, pAssembly->tool_type );
++			 
++    for( j = 0; j < pAssembly->lNumComponents; j++ )
++    {
++      fprintf( pFile, "Component           #%d %d %d %d\n",
++	pAssembly->pComponents[ j ].lVnum,
++	(pAssembly->pComponents[ j ].bExtract ? 1 : 0),
++	(pAssembly->pComponents[ j ].bInRoom ? 1 : 0),
++	pAssembly->pComponents[ j ].chow_many);
++    }
++
++    if( i < g_lNumAssemblies - 1 )
++      fprintf( pFile, "\n" );
++  }
++
++  fclose( pFile );
++}
++
++void assemblyListToChar( struct char_data *pCharacter )
++{
++  char		szAssmType[ MAX_INPUT_LENGTH ] = { '\0' };
++  long		i = 0;			// Outer iterator.
++  long		j = 0;			// Inner iterator.
++  obj_rnum		lRnum = 0;		// Object rnum for obj_proto indexing.
++
++  if( pCharacter == NULL )
++  {
++    log( "SYSERR: assemblyListAssembliesToChar(): NULL 'pCharacter'." );
++    return;
++  }
++  else if( g_pAssemblyTable == NULL )
++  {
++    send_to_char(pCharacter, "No assemblies exist.\r\n");
++    return;
++  }
++
++  /* Send out a "header" of sorts. */
++  send_to_char(pCharacter, "The following assemblies exists:\r\n");
++
++  for( i = 0; i < g_lNumAssemblies; i++ )
++  {
++    if( (lRnum = real_object( g_pAssemblyTable[ i ].lVnum )) < 0 )
++    {
++     send_to_char(pCharacter, "[-----] ***RESERVED***\r\n");
++      log( "SYSERR: assemblyListToChar(): Invalid vnum #%d in assembly table.", g_pAssemblyTable[i].lVnum);
++    }
++    else
++    {
++      sprinttype( g_pAssemblyTable[ i ].uchAssemblyType, AssemblyTypes, szAssmType, sizeof(szAssmType));
++      send_to_char(pCharacter, "[%5d] %s (%s, lvl:%d, Exp:%d)\r\n", g_pAssemblyTable[ i ].lVnum,
++	obj_proto[ lRnum ].short_description, szAssmType, g_pAssemblyTable[ i ].level_to_make,
++		  g_pAssemblyTable[ i ].exp_given);
++
++      for( j = 0; j < g_pAssemblyTable[ i ].lNumComponents; j++ )
++      {
++	if( (lRnum = real_object( g_pAssemblyTable[ i ].pComponents[ j ].lVnum )) < 0 )
++	{
++	  send_to_char(pCharacter, " -----: ***RESERVED***\r\n");
++	  log( "SYSERR: assemblyListToChar(): Invalid component vnum #%d in assembly for vnum #%d.",
++	    g_pAssemblyTable[ i ].pComponents[ j ].lVnum, g_pAssemblyTable[ i ].lVnum );
++	}
++	else
++	{
++	  send_to_char(pCharacter, " %5d: %-20s Extract=%-3.3s InRoom=%-3.3s\r\n",
++	    g_pAssemblyTable[ i ].pComponents[ j ].lVnum,
++	    obj_proto[ lRnum ].short_description,
++	    (g_pAssemblyTable[ i ].pComponents[ j ].bExtract ? "Yes" : "No"),
++	    (g_pAssemblyTable[ i ].pComponents[ j ].bInRoom  ? "Yes" : "No") );
++	}
++      }
++    }
++  }
++}
++
++void assemblyComponentList(obj_vnum lVnum, struct char_data *pCharacter)
++{
++
++  long		i = 0;			// Outer iterator.
++  long		j = 0;			// Inner iterator.
++  obj_rnum		lRnum = 0;		// Object rnum for obj_proto indexing.
++  OBJBANK_DATA *objbank;
++  
++  if( (assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyCheck_level(): Invalid 'lVnum' #%d.", lVnum );
++    return;
++  }
++	
++  for( i = 0; i < g_lNumAssemblies; i++ )
++  {
++   if( g_pAssemblyTable[ i ].lVnum != lVnum )
++   continue;	
++	    else
++			{
++    if( (lRnum = real_object( g_pAssemblyTable[ i ].lVnum )) < 0 )
++    {
++      log( "SYSERR: assemblyListToMort(): Invalid vnum #%d in assembly table.", g_pAssemblyTable[i].lVnum);
++	  return;
++    } else {	
++      if(GET_LEVEL(pCharacter) < 1)	
++      send_to_char(pCharacter, "\r\nobject:            (%d)[%s] lvl: %d, Exp: %d  Selling Price: %d\r\n",g_pAssemblyTable[ i ].how_many,
++	  obj_proto[ lRnum ].short_description, g_pAssemblyTable[ i ].level_to_make,  g_pAssemblyTable[ i ].exp_given,
++		  ((!(objbank = find_objbank_number(g_pAssemblyTable[ i ].lVnum))) ?  -1 : objbank->alch * g_pAssemblyTable[ i ].how_many));
++      else	
++      send_to_char(pCharacter, "\r\nobject:     [%5d] (%d)[%s] lvl: %d, Exp: %d  Selling Price: %d\r\n", g_pAssemblyTable[ i ].lVnum, g_pAssemblyTable[ i ].how_many,
++	  obj_proto[ lRnum ].short_description, g_pAssemblyTable[ i ].level_to_make,  g_pAssemblyTable[ i ].exp_given,
++		  ((!(objbank = find_objbank_number(g_pAssemblyTable[ i ].lVnum))) ?  -1 : objbank->alch * g_pAssemblyTable[ i ].how_many));
++      for( j = 0; j < g_pAssemblyTable[ i ].lNumComponents; j++ )
++      {
++	if( (lRnum = real_object( g_pAssemblyTable[ i ].pComponents[ j ].lVnum )) < 0 )
++	{
++	  log( "SYSERR: assemblyListToMort(): Invalid component vnum #%d in assembly for vnum #%d.",
++	    g_pAssemblyTable[ i ].pComponents[ j ].lVnum, g_pAssemblyTable[ i ].lVnum );
++	}
++	else
++	{
++	  send_to_char(pCharacter, "ingredient:[%5d] (%d)%-60.60s Buy Price: %d\r\n", g_pAssemblyTable[ i ].pComponents[ j ].lVnum, g_pAssemblyTable[ i ].pComponents[ j ].chow_many, obj_proto[ lRnum ].short_description,
++	  ((!(objbank = find_objbank_number(g_pAssemblyTable[ i ].pComponents[ j ].lVnum))) ? \
++	  GET_OBJ_COST(obj_proto) * g_pAssemblyTable[ i ].pComponents[ j ].chow_many : objbank->alch * g_pAssemblyTable[ i ].pComponents[ j ].chow_many));		 
++	}
++      }
++    }
++	
++  }
++}
++}
++
++
++void assemblyListToMort( struct char_data *pCharacter , int type)
++{
++  long		i = 0;			// Outer iterator.
++  long		j = 0;			// Inner iterator.  
++  obj_rnum		lRnum = 0;		// Object rnum for obj_proto indexing.
++  long   gainloss = 0;
++  int oprice = 0;
++    OBJBANK_DATA *objbank;
++	
++  if( pCharacter == NULL )
++  {
++    log( "SYSERR: assemblyListAssembliesToChar(): NULL 'pCharacter'." );
++    return;
++  }
++  else if( g_pAssemblyTable == NULL )
++  {
++    send_to_char(pCharacter, "No assemblies exist.\r\n");
++    return;
++  }
++
++  /* Send out a "header" of sorts. */
++  send_to_char(pCharacter, "You can create the following objects with the proper ingredients.\r\n");
++
++  for( i = 0; i < g_lNumAssemblies; i++ )
++  {
++    if( (lRnum = real_object( g_pAssemblyTable[ i ].lVnum )) < 0 )
++    {
++      log( "SYSERR: assemblyListToMort(): Invalid vnum #%d in assembly table.", g_pAssemblyTable[i].lVnum);
++    }
++
++   else if( g_pAssemblyTable[ i ].uchAssemblyType != type )
++    {
++   continue;
++    }
++   else if( !assemblyCheckLevel(g_pAssemblyTable[ i ].lVnum, pCharacter) )
++    {
++   continue;
++    }
++    else
++    {
++		gainloss = 0;
++		oprice = ((!(objbank = find_objbank_number(g_pAssemblyTable[ i ].lVnum))) ?  -1 : objbank->price * g_pAssemblyTable[ i ].how_many);
++      send_to_char(pCharacter, "[%-30s] lvl: %-3d, Exp: %-4d  Price: %-7d ",
++	   obj_proto[ lRnum ].name,
++		  g_pAssemblyTable[ i ].level_to_make,  g_pAssemblyTable[ i ].exp_given,
++		  oprice);
++		  
++      for( j = 0; j < g_pAssemblyTable[ i ].lNumComponents; j++ )
++      {
++	if( (lRnum = real_object( g_pAssemblyTable[ i ].pComponents[ j ].lVnum )) < 0 )
++	{
++	  log( "SYSERR: assemblyListToMort(): Invalid component vnum #%d in assembly for vnum #%d.",
++	    g_pAssemblyTable[ i ].pComponents[ j ].lVnum, g_pAssemblyTable[ i ].lVnum );
++	}
++	else
++	{
++	  gainloss += ((!(objbank = find_objbank_number(g_pAssemblyTable[ i ].pComponents[ j ].lVnum))) ?  -1 : objbank->alch * g_pAssemblyTable[ i ].pComponents[ j ].chow_many);
++	}
++      }
++     send_to_char(pCharacter, "Gain: %ld\r\n", oprice - gainloss);
++    }
++  }
++}
++
++bool assemblyAddComponent( obj_vnum lVnum, obj_vnum lComponentVnum, bool bExtract, bool bInRoom, int how_many )
++{
++  ASSEMBLY	*pAssembly = NULL;
++  COMPONENT	*pNewComponents = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyAddComponent(): Invalid 'lVnum' #%d.", lVnum );
++    return (FALSE);
++  }
++  else if( real_object( lComponentVnum ) < 0 )
++  {
++    log( "SYSERR: assemblyAddComponent(): Invalid 'lComponentVnum' #%d.",
++      lComponentVnum );
++    return (FALSE);
++  }
++  else if( assemblyHasComponent( lVnum, lComponentVnum ) )
++  {
++    log( "SYSERR: assemblyAddComponent(): Assembly for vnum #%d already "
++      "has component vnum #%d.", lVnum, lComponentVnum );
++    return (FALSE);
++  }
++
++  /* Create a new component table with room for one more entry. */
++  CREATE( pNewComponents, COMPONENT, pAssembly->lNumComponents + 1 );
++
++  if( pAssembly->pComponents != NULL )
++  {
++    /* Copy the old table over to the new. */
++    memmove( pNewComponents, pAssembly->pComponents, pAssembly->lNumComponents * sizeof( COMPONENT ) );
++//    free( pAssembly->pComponents );
++  }
++
++  /*
++   * Assign the new component table and setup the new component entry. Then
++   * add increment the number of components.
++   */
++  pAssembly->pComponents = pNewComponents;
++  pAssembly->pComponents[ pAssembly->lNumComponents ].lVnum = lComponentVnum;
++  pAssembly->pComponents[ pAssembly->lNumComponents ].bExtract = bExtract;
++  pAssembly->pComponents[ pAssembly->lNumComponents ].bInRoom = bInRoom;
++  pAssembly->pComponents[ pAssembly->lNumComponents ].chow_many = how_many;
++  pAssembly->lNumComponents += 1;
++  
++free( pNewComponents );
++  return (TRUE);
++}
++
++bool assemblyCheckComponents( obj_vnum lVnum, struct char_data *pCharacter )
++{
++  bool		bOk = TRUE;
++  long		i = 0;
++  int h;
++  obj_rnum		lRnum = 0;
++  struct obj_data **ppComponentObjects = NULL;
++  ASSEMBLY	*pAssembly = NULL;
++  struct obj_data *obj;
++
++  if( pCharacter == NULL )
++  {
++    log( "SYSERR: NULL assemblyCheckComponents(): 'pCharacter'." );
++    return (FALSE);
++  }
++  else if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: NULL assemblyCheckComponents(): Invalid 'lVnum' #%d.", lVnum );
++    return (FALSE);
++  }
++
++  if( pAssembly->pComponents == NULL )
++    return (FALSE);
++  else if( pAssembly->lNumComponents <= 0 )
++    return (FALSE);
++
++  if (pAssembly->tool_type >= 0 && !GET_TOOL(pCharacter, pAssembly->tool_type)) {
++     bOk = FALSE;
++	 send_to_char(pCharacter, "`rYou need to be holding a good %s first!`n\r\n", tool_types[pAssembly->tool_type]);
++	}
++
++  CREATE( ppComponentObjects, struct obj_data*, pAssembly->lNumComponents );
++
++  for( i = 0; i < pAssembly->lNumComponents && bOk; i++ )
++  {
++    if( (lRnum = real_object( pAssembly->pComponents[ i ].lVnum )) < 0 )
++      bOk = FALSE;
++    else
++    {
++      if( pAssembly->pComponents[ i ].bInRoom )
++      {
++     if ( count_craft_items(pCharacter, pAssembly->pComponents[ i ].lVnum, TRUE) < pAssembly->pComponents[ i ].chow_many )		  
++	  bOk = FALSE;
++      }
++      else
++      {
++    if ( count_craft_items(pCharacter, pAssembly->pComponents[ i ].lVnum, FALSE) < pAssembly->pComponents[ i ].chow_many )
++	  bOk = FALSE;
++      }
++    }
++  }
++
++
++  for( i = 0; i < pAssembly->lNumComponents; i++ )
++  {
++    for (h = pAssembly->pComponents[ i ].chow_many; h > 0; h--)
++    {	
++      if( pAssembly->pComponents[ i ].bInRoom && bOk )
++      {
++        for (obj = world[IN_ROOM(pCharacter)].contents; obj; obj = obj->next_content)
++			if (GET_OBJ_VNUM(obj) == pAssembly->pComponents[ i ].lVnum && pAssembly->pComponents[ i ].bExtract == TRUE)
++              extract_obj( obj );			
++      }
++      else if( bOk && pAssembly->pComponents[ i ].bExtract == TRUE)
++		for (obj = pCharacter->carrying; obj; obj = obj->next_content)
++			if (GET_OBJ_VNUM(obj) == pAssembly->pComponents[ i ].lVnum)
++              extract_obj( obj );
++	}
++
++    if( ppComponentObjects[ i ] == NULL )
++      continue;
++    if( pAssembly->pComponents[ i ].bExtract && bOk )
++      extract_obj( ppComponentObjects[ i ] );
++  }
++
++  free( ppComponentObjects );
++
++  return (bOk);
++}
++
++bool assemblyCheckLevel( obj_vnum lVnum, struct char_data *pCharacter )
++{
++  ASSEMBLY	*pAssembly = NULL;
++  int type;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyCheck_level(): Invalid 'lVnum' #%d.", lVnum );
++    return (-1);
++  }
++
++  type = assemblyGetType(lVnum);
++  switch(type)
++	{
++	  case SCMD_CRAFT:
++		  if(pCharacter->player_specials->saved.crafting_level[CRAFTING] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;
++
++	  case SCMD_SCRIBE:
++		  if(pCharacter->player_specials->saved.crafting_level[SCRIBING] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;
++
++	  case SCMD_MIX:
++		  if(pCharacter->player_specials->saved.crafting_level[APOTHECARY] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;
++		
++	  case SCMD_CARVE:
++		  if(pCharacter->player_specials->saved.crafting_level[WOODWORKING] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;	
++
++	  case SCMD_SMITH:
++		  if(pCharacter->player_specials->saved.crafting_level[SMITHING] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;		
++
++	  case SCMD_SMELT:
++		  if(pCharacter->player_specials->saved.crafting_level[SMITHING] >= pAssembly->level_to_make ||
++		     GET_LEVEL(pCharacter) >= LVL_IMMORT)
++		  return TRUE;
++	    else
++			return FALSE;
++		break;
++		
++		default:
++    log("SYSERR: Bad subcmd %d in assemblyCheckLevel", type);
++			return FALSE;
++		break;
++	}
++}
++
++bool assemblyCreate( obj_vnum lVnum, int iAssembledType, int lvl, int exp, int how_many, int tool_type )
++{
++  long		lBottom = 0;
++  long		lMiddle = 0;
++  long		lTop = 0;
++  ASSEMBLY	*pNewAssemblyTable = NULL;
++
++  if( lVnum < 0 )
++    return (FALSE);
++  else if( iAssembledType < 0 || iAssembledType >= MAX_ASSM )
++    return (FALSE);
++
++  if( g_pAssemblyTable == NULL )
++  {
++    CREATE( g_pAssemblyTable, ASSEMBLY, 1 );
++    g_lNumAssemblies = 1;
++  }
++  else
++  {
++    lTop = g_lNumAssemblies - 1;
++
++    for( ;; )
++    {
++      lMiddle = (lBottom + lTop) / 2;
++
++      if( g_pAssemblyTable[ lMiddle ].lVnum == lVnum )
++	return (FALSE);
++      else if( lBottom >= lTop )
++	break;
++      else if( g_pAssemblyTable[ lMiddle ].lVnum > lVnum )
++	lTop = lMiddle - 1;
++      else
++	lBottom = lMiddle + 1;
++    }
++
++    if( g_pAssemblyTable[ lMiddle ].lVnum <= lVnum )
++      lMiddle += 1;
++
++    CREATE( pNewAssemblyTable, ASSEMBLY, g_lNumAssemblies + 1 );
++
++    if( lMiddle > 0 )
++      memmove( pNewAssemblyTable, g_pAssemblyTable, lMiddle * sizeof( ASSEMBLY ) );
++
++    if( lMiddle <= g_lNumAssemblies - 1 )
++      memmove( pNewAssemblyTable + lMiddle + 1, g_pAssemblyTable + lMiddle, (g_lNumAssemblies - lMiddle) * sizeof( ASSEMBLY ) );
++
++    free( g_pAssemblyTable );
++    g_pAssemblyTable = pNewAssemblyTable;
++    g_lNumAssemblies += 1;
++  }
++
++  g_pAssemblyTable[ lMiddle ].lNumComponents = 0;
++  g_pAssemblyTable[ lMiddle ].lVnum = lVnum;
++  g_pAssemblyTable[ lMiddle ].level_to_make = lvl;
++  g_pAssemblyTable[ lMiddle ].exp_given = exp;
++  g_pAssemblyTable[ lMiddle ].how_many = how_many;  
++  g_pAssemblyTable[ lMiddle ].tool_type = tool_type;
++  g_pAssemblyTable[ lMiddle ].pComponents = NULL;
++  g_pAssemblyTable[ lMiddle ].uchAssemblyType = (unsigned char) iAssembledType;
++
++  return (TRUE);
++}
++
++bool assemblyDestroy( obj_vnum lVnum )
++{
++  long		lIndex = 0;
++  ASSEMBLY	*pNewAssemblyTable = NULL;
++
++  /* Find the real number of the assembled vnum. */
++  if( g_pAssemblyTable == NULL || (lIndex = assemblyGetAssemblyIndex( lVnum )) < 0 )
++  {
++    log( "SYSERR: assemblyDestroy(): Invalid 'lVnum' #%d.", lVnum );
++    return (FALSE);
++  }
++
++  /* Deallocate component array. */
++  if( g_pAssemblyTable[ lIndex ].pComponents != NULL )
++    free( g_pAssemblyTable[ lIndex ].pComponents );
++
++  if( g_lNumAssemblies > 1 )
++  {
++    /* Create a new table, the same size as the old one less one item. */
++    CREATE( pNewAssemblyTable, ASSEMBLY, g_lNumAssemblies - 1 );
++
++    /* Copy all assemblies before the one removed into the new table. */
++    if( lIndex > 0 )
++      memmove( pNewAssemblyTable, g_pAssemblyTable, lIndex * sizeof( ASSEMBLY ) );
++
++    /* Copy all assemblies after the one removed into the new table. */
++    if( lIndex < g_lNumAssemblies - 1 )
++    {
++      memmove( pNewAssemblyTable + lIndex, g_pAssemblyTable + lIndex + 1, (g_lNumAssemblies - lIndex - 1) *
++	sizeof( ASSEMBLY ) );
++    }
++  }
++
++  /* Deallocate the old table. */
++  free( g_pAssemblyTable );
++
++  /* Decrement the assembly count and assign the new table. */
++  g_lNumAssemblies -= 1;
++  g_pAssemblyTable = pNewAssemblyTable;
++
++  return (TRUE);
++}
++
++bool assemblyHasComponent( obj_vnum lVnum, obj_vnum lComponentVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++  
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyHasComponent(): Invalid 'lVnum' #%d.", lVnum );
++    return (FALSE);
++  }
++
++  return (assemblyGetComponentIndex( pAssembly, lComponentVnum ) >= 0);
++}
++
++bool assemblyRemoveComponent( obj_vnum lVnum, obj_vnum lComponentVnum )
++{
++  long		lIndex = 0;
++  ASSEMBLY	*pAssembly = NULL;
++  COMPONENT	*pNewComponents = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyRemoveComponent(): Invalid 'lVnum' #%d.", lVnum );
++    return (FALSE);
++  }
++  else if( (lIndex = assemblyGetComponentIndex( pAssembly, lComponentVnum )) < 0 )
++  {
++    log( "SYSERR: assemblyRemoveComponent(): Vnum #%d is not a "
++      "component of assembled vnum #%d.", lComponentVnum, lVnum );
++    return (FALSE);
++  }
++
++  if( pAssembly->pComponents != NULL && pAssembly->lNumComponents > 1 )
++  {
++    CREATE( pNewComponents, COMPONENT, pAssembly->lNumComponents - 1 );
++
++    if( lIndex > 0 )
++      memmove( pNewComponents, pAssembly->pComponents, lIndex * sizeof( COMPONENT ) );
++
++    if( lIndex < pAssembly->lNumComponents - 1 )
++    {
++      memmove( pNewComponents + lIndex, pAssembly->pComponents + lIndex + 1,
++	(pAssembly->lNumComponents - lIndex - 1) * sizeof( COMPONENT ) );
++    }
++  }
++
++  free( pAssembly->pComponents );
++  pAssembly->pComponents = pNewComponents;
++  pAssembly->lNumComponents -= 1;
++
++  return (TRUE);
++}
++
++int assemblyGetType( obj_vnum lVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyGetType(): Invalid 'lVnum' #%d.", lVnum );
++    return (-1);
++  }
++
++  return ((int) pAssembly->uchAssemblyType);
++}
++
++int assemblyGetExp( obj_vnum lVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyGetExp(): Invalid 'lVnum' #%d.", lVnum );
++    return (-1);
++  }
++
++  return ((int) pAssembly->exp_given);
++}
++
++int assemblyGetTool( obj_vnum lVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyGetExp(): Invalid 'lVnum' #%d.", lVnum );
++    return (-1);
++  }
++
++  return ((int) pAssembly->tool_type);
++}
++
++int assemblyGetHowmany( obj_vnum lVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyGetExp(): Invalid 'lVnum' #%d.", lVnum );
++    return (-1);
++  }
++
++  return ((int) pAssembly->how_many);
++}
++
++long assemblyCountComponents( obj_vnum lVnum )
++{
++  ASSEMBLY	*pAssembly = NULL;
++
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyCountComponents(): Invalid 'lVnum' #%d.", lVnum );
++    return (0);
++  }
++
++  return (pAssembly->lNumComponents);
++}
++
++long assemblyFindAssembly( const char *pszAssemblyName, int subcmd)
++{
++  long		i = 0;
++  obj_rnum		lRnum = NOTHING;
++
++  if( g_pAssemblyTable == NULL )
++    return (-1);
++  else if( pszAssemblyName == NULL || *pszAssemblyName == '\0' )
++    return (-1);
++
++  for( i = 0; i < g_lNumAssemblies; i++ )
++  {
++	  if(subcmd != g_pAssemblyTable[ i ].uchAssemblyType)
++		  continue;
++    if( (lRnum = real_object( g_pAssemblyTable[ i ].lVnum )) < 0 )
++      log( "SYSERR: assemblyFindAssembly(): Invalid vnum #%d in assembly table.", g_pAssemblyTable[i].lVnum );
++    else if( is_abbrev( pszAssemblyName, obj_proto[ lRnum ].name ) )
++      return (g_pAssemblyTable[ i ].lVnum);
++    else if( is_name( pszAssemblyName, obj_proto[ lRnum ].name ) )
++      return (g_pAssemblyTable[ i ].lVnum);  
++  }
++
++  return (-1);
++}
++
++void assemblyReturnComponents( struct char_data *ch, obj_vnum lVnum)
++{
++  int i, h;
++  struct obj_data **ppComponentObjects = NULL;
++  ASSEMBLY	*pAssembly = NULL;
++  struct obj_data *obj;	
++  
++  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
++  {
++    log( "SYSERR: assemblyReturnComponents(): Invalid 'lVnum' #%d.", lVnum );
++    return;
++  }	
++  
++  
++   CREATE( ppComponentObjects, struct obj_data*, pAssembly->lNumComponents );
++
++  for( i = 0; i < pAssembly->lNumComponents; i++ )
++  {
++    for (h = pAssembly->pComponents[ i ].chow_many; h > 0; h--)
++    {	
++      if( pAssembly->pComponents[ i ].bInRoom && pAssembly->pComponents[ i ].bExtract == TRUE)
++      {
++		  if(real_object(pAssembly->pComponents[ i ].lVnum) != NOTHING)
++		  {
++		   obj = read_object(real_object(pAssembly->pComponents[ i ].lVnum), REAL);
++		   obj_to_room(obj, IN_ROOM(ch));
++		  }
++	  }
++      if( (!pAssembly->pComponents[ i ].bInRoom) && pAssembly->pComponents[ i ].bExtract == TRUE)
++      {
++		  if(real_object(pAssembly->pComponents[ i ].lVnum) != NOTHING)
++		  {
++		   obj = read_object(real_object(pAssembly->pComponents[ i ].lVnum), REAL);
++		   obj_to_char(obj, ch);
++		  }
++	  }		  
++	}
++  }
++
++  free( ppComponentObjects ); 
++	
++}
++
++void break_mould(struct char_data *ch)
++{
++  int i;
++  struct obj_data **ppComponentObjects = NULL;
++  ASSEMBLY	*pAssembly = NULL;
++  struct obj_data *obj; 
++  
++  if( (pAssembly = assemblyGetAssemblyPtr( GET_ACTION_REWARD(ch) )) == NULL )
++  {
++    log( "SYSERR: break_mould(): Invalid 'lVnum' #%d.", GET_ACTION_REWARD(ch) );
++    return;
++  }	
++  
++  
++   CREATE( ppComponentObjects, struct obj_data*, pAssembly->lNumComponents );
++
++  for( i = 0; i < pAssembly->lNumComponents; i++ )
++  {
++      if( (!pAssembly->pComponents[ i ].bInRoom) && pAssembly->pComponents[ i ].bExtract == FALSE)
++      {
++		  if(real_object(pAssembly->pComponents[ i ].lVnum) != NOTHING)
++		  {
++		   //search inventory
++	for (obj = ch->carrying; obj; obj = obj->next_content)
++          if (rand_number(0, 20) == 0  && (GET_OBJ_VNUM(obj) == (pAssembly->pComponents[ i ].lVnum ))){		   
++		       send_to_char(ch, "The %s breaks!\r\n", obj->short_description);				
++               obj_from_char(obj);
++               extract_obj(obj);
++		  }
++	  }		  
++	}
++  }
++
++
++  free( ppComponentObjects ); 
++	
++}	
++	
++
++
++long assemblyGetAssemblyIndex( obj_vnum lVnum )
++{
++  long		lBottom = 0;
++  long		lMiddle = 0;
++  long		lTop = 0;
++
++  lTop = g_lNumAssemblies - 1;
++
++  for( ;; )
++  {
++    lMiddle = (lBottom + lTop) / 2;
++
++    if( g_pAssemblyTable[ lMiddle ].lVnum == lVnum )
++      return (lMiddle);
++    else if( lBottom >= lTop )
++      return (-1);
++    else if( g_pAssemblyTable[ lMiddle ].lVnum > lVnum )
++      lTop = lMiddle - 1;
++    else
++      lBottom = lMiddle + 1;
++  }
++}
++
++long assemblyGetComponentIndex( ASSEMBLY *pAssembly, obj_vnum lComponentVnum )
++{
++  long		i = 0;
++
++  if( pAssembly == NULL )
++    return (-1);
++
++  for( i = 0; i < pAssembly->lNumComponents; i++ )
++  {
++    if( pAssembly->pComponents[ i ].lVnum == lComponentVnum )
++      return (i);
++  }
++
++  return (-1);
++}
++
++ASSEMBLY* assemblyGetAssemblyPtr( obj_vnum lVnum )
++{
++  long		lIndex = 0;
++
++  if( g_pAssemblyTable == NULL )
++    return (NULL);
++
++  if( (lIndex = assemblyGetAssemblyIndex( lVnum )) >= 0 )
++    return (g_pAssemblyTable + lIndex);
++
++  return (NULL);
++}
++
++ACMD(do_assemble)
++{
++  obj_vnum		lVnum = NOTHING;
++  struct obj_data *pObject = NULL;
++    char buf[100];
++	
++  if (IS_NPC(ch))
++    return;
++  else if (GET_ACTION(ch) != ACT_NONE) {
++    send_to_char(ch, "You are busy %s already!\r\n", action_types[GET_ACTION(ch)]);
++    return;
++  }	
++	
++  skip_spaces(&argument);
++
++    strcpy(buf, CMD_NAME);
++  if (*argument == '\0') {
++//	if (GET_LEVEL(ch) > 0)
++//		assemblyListToChar( ch );
++//	else
++    assemblyListToMort(ch, subcmd);
++    return;
++  } else if ((lVnum = assemblyFindAssembly(argument, subcmd)) < 0) {
++    send_to_char(ch, "You can't %s %s %s.\r\n", buf, AN(argument), argument);
++    return;
++  } else if (assemblyGetType(lVnum) != subcmd) {
++    send_to_char(ch, "You can't %s %s %s.\r\n", buf, AN(argument), argument);
++    return;
++  } else if (!assemblyCheckLevel(lVnum, ch)) {
++    send_to_char(ch, "You are not high enough level to %s %s %s.\r\n", buf, AN(argument), argument);
++    return;
++  } else if (!assemblyCheckComponents(lVnum, ch)) {
++    send_to_char(ch, "You haven't all the parts to make that.\r\n");
++	assemblyComponentList(lVnum, ch);
++    return;
++  }
++
++  /* Create the assembled object. */
++  if ((pObject = read_object(lVnum, VIRTUAL)) == NULL ) {
++    send_to_char(ch, "You can't %s %s %s.\r\n", buf, AN(argument), argument);
++    return;
++  }
++
++  /* give exp */
++  switch(subcmd)
++	{
++  case SCMD_CRAFT:
++  act("You begin crafting!", FALSE, ch, 0, 0, TO_CHAR);
++  act("$n begins crafting!", FALSE, ch, 0, 0, TO_ROOM); 
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, CRAFTING) / 10));
++  GET_ACTION(ch) = ACT_CRAFTING; 
++  extract_obj(pObject);  
++  return; 
++  break;
++
++  case SCMD_SCRIBE:
++  act("You start to meticulously scribe on the paper!", FALSE, ch, 0, 0, TO_CHAR); 
++  act("$n begins scribing!", FALSE, ch, 0, 0, TO_ROOM);  
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, SCRIBING) / 10));
++  GET_ACTION(ch) = ACT_SCRIBING; 
++  extract_obj(pObject);  
++  return; 
++  break;
++
++  case SCMD_MIX:
++  act("You begin slowly stirring ingredients into your vial!", FALSE, ch, 0, 0, TO_CHAR);  
++  act("$n begins mixing!", FALSE, ch, 0, 0, TO_ROOM);  
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, APOTHECARY) / 10));
++  GET_ACTION(ch) = ACT_MIXING; 
++  extract_obj(pObject);  
++  return;  
++  break;
++  
++  case SCMD_CARVE:
++  act("You begin carving!", FALSE, ch, 0, 0, TO_CHAR);  
++  act("$n begins carving!", FALSE, ch, 0, 0, TO_ROOM);  
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, WOODWORKING) / 10));
++  GET_ACTION(ch) = ACT_WOODWORKING; 
++  extract_obj(pObject);  
++  return;  
++  break;  
++  
++  case SCMD_SMITH:
++  if (!(get_obj_in_list_vis(ch, "anvil", NULL, world[IN_ROOM(ch)].contents))) {
++     send_to_char(ch, "There is no anvil here!\r\n");
++	 assemblyReturnComponents(ch, lVnum);
++     return;
++  }  
++  act("You raise your hammer to begin smithing!", FALSE, ch, 0, 0, TO_CHAR);
++  act("$n raises their hammer to begin smithing!", FALSE, ch, 0, 0, TO_ROOM);  
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, SMITHING) / 10));
++  GET_ACTION(ch) = ACT_SMITHING; 
++  extract_obj(pObject);  
++  return;  
++  break;  
++
++ case SCMD_SMELT:
++  if (!(get_obj_in_list_vis(ch, "forge", NULL, world[IN_ROOM(ch)].contents))) {
++     send_to_char(ch, "There is no forge here!\r\n");
++	 assemblyReturnComponents(ch, lVnum);
++     return;
++  }  
++  act("You put the components into the forge!", FALSE, ch, 0, 0, TO_CHAR);
++  act("$n carefully puts components into the forge!", FALSE, ch, 0, 0, TO_ROOM);
++  GET_ACTION_REWARD(ch) = lVnum;   
++  GET_ACTION_TIMER(ch) = 2 + (10 - (GET_CRAFT_LEV(ch, SMITHING) / 10));
++  GET_ACTION(ch) = ACT_SMELTING; 
++  extract_obj(pObject);  
++  return;  
++  break;  
++
++  default:
++    log("SYSERR: Bad experience subcmd %d in do_assemble", subcmd);
++  break;
++	}
++
++  /* Tell the character they made something. */
++  snprintf(buf, sizeof(buf), "You %s $p.", CMD_NAME);
++  act(buf, FALSE, ch, pObject, NULL, TO_CHAR);
++
++  /* Tell the room the character made something. */
++  snprintf(buf, sizeof(buf), "$n %ss $p.", CMD_NAME);
++  act(buf, FALSE, ch, pObject, NULL, TO_ROOM);
++  
++   /* Now give the object to the character. */
++    if (can_autosell(ch, pObject) == FALSE)
++      obj_to_char(pObject, ch); 
++}
++
++static void count_obj_by_type(void)
++{
++	obj_rnum i;
++
++numswfish = 0;
++numfwfish = 0;
++numores = 0;
++numseeds = 0;	
++  for (i = 0; i <= top_of_objt; i++) {
++    if (obj_proto[i].obj_flags.type_flag == ITEM_SWFISH)
++       numswfish++;	  
++    else if (obj_proto[i].obj_flags.type_flag == ITEM_FWFISH)
++       numfwfish++;	  
++    else if (obj_proto[i].obj_flags.type_flag == ITEM_ORE)
++       numores++;
++    else if (obj_proto[i].obj_flags.type_flag == ITEM_SEED)
++       numseeds++;	   
++  }
++return;   
++}
++
++ACMD(do_plant)
++{
++  struct obj_data *tool, *seed;
++  char arg[MAX_INPUT_LENGTH];
++  one_argument(argument, arg);
++  
++  if (IS_NPC(ch) || GET_ACTION(ch) != ACT_NONE) {
++    send_to_char(ch, "You are already %s!\r\n", action_types[GET_ACTION(ch)]);
++    return;
++  }
++
++  if (!(tool = GET_TOOL(ch, TOOL_HOE)) ||
++      (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_HOE || GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "You need to be holding a good hoe first.\r\n");
++    return;
++  }	
++ 
++if (world[ch->in_room].roomval[0] >= 1) {
++     send_to_char(ch, "There is already something planted here.\r\n");
++    return;
++  } 
++  if (!*arg) {
++    send_to_char(ch, "What do you want to plant??\r\n");
++    return;
++  }  
++  if (!(seed = get_obj_in_list_vis(ch, arg, NULL, ch->carrying))) {
++    send_to_char(ch, "You don't have such an item.\r\n");
++      return;
++    }
++	
++  if (SECT(ch->in_room) != GET_OBJ_VAL(seed, 3)) {
++    send_to_char(ch, "This is not a good place to plant that.\r\n");
++      return;
++    }	
++	
++  if (GET_CRAFT_LEV(ch, FARMING) < GET_OBJ_LEVEL(seed)) {
++    send_to_char(ch, "Your farming isnt high enough to plant this.\r\n");
++      return;
++    }	
++	
++  GET_OBJ_VAL(tool, 2) -= 1;
++
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "As you dig into the ground your hoe breaks, rendering it useless!\r\n");
++	extract_obj(untool_char(ch, TOOL_HOE));
++    GET_ACTION(ch) = ACT_NONE;	
++	return;
++  }	
++world[ch->in_room].roomval[1] = 0;	
++world[ch->in_room].roomval[2] = 0;
++world[ch->in_room].roomval[3] = 0;
++	GET_ACTION(ch) = ACT_PLANTING;
++	GET_ACTION_REWARD(ch) = (int) GET_OBJ_VNUM(seed);
++	GET_ACTION_TIMER(ch) = 12 - GET_OBJ_VAL(tool, 1);
++						act("You grab your hoe and begin tilling the ground!", FALSE, ch, 0, 0, TO_CHAR);
++						act("$n grabs their hoe and begins tilling the ground!", FALSE, ch, 0, 0, TO_ROOM);
++						
++					obj_from_char(seed);
++					extract_obj(seed);	
++}
++	
++
++
++ACMD(do_chop)
++{
++  struct obj_data *tool;
++  obj_rnum i;
++  
++  if (IS_NPC(ch) || GET_ACTION(ch) != ACT_NONE) {
++    send_to_char(ch, "You are already %s!\r\n", action_types[GET_ACTION(ch)]);
++    return;
++  }
++
++if (SECT(ch->in_room) != SECT_FOREST){
++    send_to_char(ch, "Nothing here to chop.\r\n");
++    return;	
++}
++	
++  if (!(tool = GET_TOOL(ch, TOOL_AXE)) ||
++      (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_AXE || GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "You need to be holding a good axe first.\r\n");
++    return;
++  }	
++
++if (world[ch->in_room].roomval[0] < 1) {
++     send_to_char(ch, "Nothing is planted here.\r\n");
++    return;
++  } 
++if (world[ch->in_room].roomval[1] > 0 && world[ch->in_room].roomval[1] != GET_IDNUM(ch)) {
++     send_to_char(ch, "This tree belongs to someone else.\r\n");
++    return;
++  } 
++
++     for (i = 0; i <= top_of_objt; i++) { 
++       if(obj_index[i].vnum == world[ch->in_room].roomval[0])
++		  break;
++	 }
++	 
++if (i == 0 || i >= top_of_objt) {
++    send_to_char(ch, "bad reward mining.\r\n");
++      return;
++    }	 
++	 
++if (GET_CRAFT_LEV(ch, WOODWORKING) < obj_proto[i].obj_flags.level) {
++    send_to_char(ch, "Your woodworking isnt high enough to chop this.\r\n");
++      return;
++    }
++if (world[IN_ROOM(ch)].roomval[3] <= obj_proto[i].obj_flags.value[3]) {
++     send_to_char(ch, "This tree is too tiny.\r\n");
++    return;
++  }	
++  
++	GET_ACTION(ch) = ACT_CHOPPING;
++						act("You pull back your axe to start cutting!", FALSE, ch, 0, 0, TO_CHAR);
++						act("$n pulls back their axe to start chopping!", FALSE, ch, 0, 0, TO_ROOM);
++}
++
++ACMD(do_harvest)
++{
++  struct obj_data *tool;
++  obj_rnum i;
++  
++  if (IS_NPC(ch) || GET_ACTION(ch) != ACT_NONE) {
++    send_to_char(ch, "You are busy %s!\r\n", action_types[GET_ACTION(ch)]);
++    return;
++  }
++
++if (SECT(ch->in_room) != SECT_FIELD){
++    send_to_char(ch, "Nothing here to harvest.\r\n");
++    return;	
++}
++ 
++  if (!(tool = GET_TOOL(ch, TOOL_HOE)) ||
++      (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_HOE || GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "You need to be holding a good hoe first.\r\n");
++    return;
++  }	
++
++if (world[ch->in_room].roomval[0] < 1) {
++     send_to_char(ch, "Nothing is planted here.\r\n");
++    return;
++  } 
++if (world[ch->in_room].roomval[1] > 0 && world[ch->in_room].roomval[1] != GET_IDNUM(ch)) {
++     send_to_char(ch, "This crop belongs to someone else.\r\n");
++    return;
++  } 
++
++     for (i = 0; i <= top_of_objt; i++) { 
++       if(obj_index[i].vnum == world[ch->in_room].roomval[0])
++		  break;
++	 }
++	 
++if (i == 0 || i >= top_of_objt) {
++    send_to_char(ch, "bad reward.\r\n");
++      return;
++    }	 
++	 
++if (GET_CRAFT_LEV(ch, FARMING) < obj_proto[i].obj_flags.level) {
++    send_to_char(ch, "Your farming isnt high enough to harvest this.\r\n");
++      return;
++    }
++if (world[IN_ROOM(ch)].roomval[3] <= obj_proto[i].obj_flags.value[3]) {
++     send_to_char(ch, "This crop isnt ready.\r\n");
++    return;
++  }	
++  
++	GET_ACTION(ch) = ACT_FARMING;
++						act("You dig at the crop!", FALSE, ch, 0, 0, TO_CHAR);
++						act("$n dig at the crop!", FALSE, ch, 0, 0, TO_ROOM);
++}
++
++
++ACMD(do_mine)
++{
++    struct obj_data *tool;
++    char sdir[MAX_INPUT_LENGTH];
++	int dir = 0;
++	
++  if (!(tool = GET_TOOL(ch, TOOL_PICK)) ||
++      (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_PICK || GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "You need to be holding a mining pick first.\r\n");
++	
++    return;
++  }
++
++one_argument(argument, sdir);  
++
++  if (!*sdir) {
++
++if (world[ch->in_room].roomval[0] < 1 || SECT(ch->in_room) != SECT_MINESHAFT) {
++     send_to_char(ch, "Nothing here to mine.");
++    return;
++  } 
++  
++    if ( ! (GET_MOVE(ch) >= 2) ) {
++    send_to_char(ch, "I am sorry, but you seem too tired to try to do that.\r\n");
++    return;
++  }	
++  
++  if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch)) {
++    send_to_char(ch, "You can't carry anything else.\r\n");
++    return;
++  }
++  
++  send_to_char(ch, "You raise your pick high in the air and slam it into the ground.\r\n");
++  act("$n raises $s pick to start mining.",
++       FALSE, ch, 0, 0, TO_ROOM);
++  GET_ACTION_TIMER(ch) = rand_number(1, (12 - GET_OBJ_VAL(tool, 1)));
++  GET_ACTION_REWARD(ch) = world[ch->in_room].roomval[0]; 
++  GET_ACTION(ch) = ACT_MINING;
++  return;
++} else {
++	  dir = search_block(sdir, dirs, FALSE);
++ 
++  if (SECT(ch->in_room) != SECT_MINESHAFT) {
++     send_to_char(ch, "You can only mine in the mineshafts.");
++    return;
++  }
++  
++  if (dir < 0 || dir == UP || dir == DOWN) {
++    send_to_char(ch, "You cannot mine to the '%s'.\r\n", sdir);
++    return;
++  }
++
++  /* Can't dig in a direction, if it's already a door. */
++  if (W_EXIT(IN_ROOM(ch), dir)) {
++      send_to_char(ch, "There's already is an exit to the %s.\r\n", dirs[dir]);
++      return;
++  }
++  
++    if (GET_MOVE(ch) <= 2) {
++    send_to_char(ch, "Try as you might, you seem too tired to raise your pick.\r\n");
++    return;
++  }	
++  
++  send_to_char(ch, "You raise your pick high in the air and slam it into the ground.\r\n");
++  act("$n raises $s pick to start digging.", FALSE, ch, 0, 0, TO_ROOM);
++  GET_ACTION_TIMER(ch) = rand_number(1, (15 - GET_OBJ_VAL(tool, 1)));
++  GET_ACTION_REWARD(ch) = dir; 
++  GET_ACTION(ch) = ACT_DIGGING;
++}
++}
++	
++ACMD(do_castout)
++{
++  struct obj_data *pole;
++  int fail;
++
++  if (IS_NPC(ch) || GET_ACTION(ch) == ACT_FISHING) {
++    send_to_char(ch, "You are already fishing!\r\n");
++    return;
++  }
++
++  if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch)) {
++    send_to_char(ch, "You can't carry any more fish.\r\n");
++    return;
++  }
++
++  if (!(pole = GET_TOOL(ch, TOOL_FISHINGPOLE)) ||
++      (GET_OBJ_TYPE(pole) != ITEM_TOOL) || GET_OBJ_VAL(pole, 0) != TOOL_FISHINGPOLE || \
++	  GET_OBJ_VAL(pole, 2) <= 0) {
++    send_to_char(ch, "You need to be holding a good fishing pole first.\r\n");
++    return;
++  }
++  
++ if (!IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_FWFISH) && !IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_SWFISH) && \
++ (world[IN_ROOM(ch)].sector_type != SECT_WATER_SWIM) && (world[IN_ROOM(ch)].sector_type != SECT_WATER_NOSWIM)) {
++    send_to_char(ch, "This is not a good place to fish, you'll want to find a"
++                 " better spot.\r\n");
++    return;
++  }
++  
++  fail = rand_number(0, MAX(pole->obj_flags.value[1], 1)+(GET_CRAFT_LEV(ch, FISHING)/10));
++  if (fail <= 1) {
++    send_to_char(ch, "You pull your arm back and try to cast out your line, but "
++                 "it gets all tangled up.\r\nTry again.\r\n");
++    act("$n pulls $s arm back, trying to cast $s fishing line out into the "
++        "water,\r\nbut ends up just a bit tangled.",
++         FALSE, ch, 0, 0, TO_ROOM);
++    return;
++  }
++  /* Ok, now they've gone through the checks, now set them fishing */
++  REMOVE_BIT_AR(PLR_FLAGS(ch), PLR_FISHON);
++  GET_ACTION(ch) = ACT_FISHING;
++  send_to_char(ch, "You cast your line out into the water, hoping for a bite.\r\n");
++  act("$n casts $s line out into the water, hoping to catch some fish.",
++       FALSE, ch, 0, 0, TO_ROOM);
++  return;
++}
++
++ACMD(do_reelin)
++{
++  obj_rnum o;	
++  struct obj_data *fish = NULL;
++  struct obj_data *pole = NULL;
++  int pole_s = 0, fish_s = 0, success = 0, counter, counted;	
++
++  if (IS_NPC(ch))
++	return;
++
++
++  if (GET_ACTION(ch) != ACT_FISHING) {
++    send_to_char(ch, "You aren't even fishing!\r\n");
++	REMOVE_BIT_AR(PLR_FLAGS(ch), PLR_FISHON);
++    return;
++  }
++ 
++  GET_ACTION(ch) = ACT_NONE;  
++  
++  if (!PLR_FLAGGED(ch, PLR_FISHON)) {
++    send_to_char(ch, "You reel in your line, but alas... nothing on the end.\r\n"
++                 "Better luck next time.\r\n");
++    return;
++  }	
++ 
++  	REMOVE_BIT_AR(PLR_FLAGS(ch), PLR_FISHON);
++ 
++  if ((!(pole = GET_TOOL(ch, TOOL_FISHINGPOLE))) ||
++      (GET_OBJ_TYPE(pole) != ITEM_TOOL) || GET_OBJ_VAL(pole, 0) != TOOL_FISHINGPOLE || \
++	  GET_OBJ_VAL(pole, 2) <= 0) {
++	send_to_char(ch, "As you reel in your pole it snaps, rendering it useless!\r\n");	  
++    return;
++  } else  
++     GET_OBJ_VAL(pole, 2) -= 1;
++
++  if (GET_OBJ_VAL(pole, 2) <= 0) {
++    send_to_char(ch, "As you reel in your pole it snaps, rendering it useless!\r\n");
++	extract_obj(untool_char(ch, TOOL_FISHINGPOLE));
++	return;
++  }	
++  
++  /* Ok, they are fishing and have a fish on */
++  if (GET_CRAFT_LEV(ch, FISHING) <= 1)
++   success = rand_number(2, 6);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 2)
++   success = rand_number(2, 7);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 4)
++   success = rand_number(2, 8);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 6)
++   success = rand_number(2, 9);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 9)
++   success = rand_number(2, 10);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 20)
++   success = rand_number(2, 11);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 40)
++   success = rand_number(3, 11);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 70)
++   success = rand_number(4, 11);
++  else if (GET_CRAFT_LEV(ch, FISHING) <= 99)
++   success = rand_number(4, 12);
++  else
++   success = rand_number(4, 13);
++	
++  if (success <= 4) {
++    send_to_char(ch, "You reel in your line, putting up a good fight, but you " \
++                 "lose him!\r\nTry again?\r\n");
++    act("$n reels $s line in, fighting with whatever is on the end, but loses " \
++        "the catch.", FALSE, ch, 0, 0, TO_ROOM);
++    return;
++  }
++ 
++  if ((numswfish > 0) && (IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_SWFISH) ||  (world[IN_ROOM(ch)].sector_type == SECT_WATER_NOSWIM))){
++	  counted = rand_number(1, numswfish);
++      counter = 0;	  
++  for (o = 0; o <= top_of_objt; o++) {
++	  if(obj_proto[o].obj_flags.type_flag == ITEM_SWFISH)
++	     counter++;
++	  if(counter == counted)
++        break;
++     }
++	} else 
++  if ((numfwfish > 0) && (IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_FWFISH) || (world[IN_ROOM(ch)].sector_type == SECT_WATER_SWIM))){
++	  counted = rand_number(1, numfwfish);
++      counter = 0;	  
++  for (o = 0; o <= top_of_objt; o++) {
++	  if(obj_proto[o].obj_flags.type_flag == ITEM_FWFISH)
++	     counter++;
++	  if(counter == counted)
++        break;
++     }
++	} else {
++    send_to_char(ch, "You reel in your line, putting up a good fight, but you lose him!\r\nTry again?\r\n");
++    act("$n reels $s line in, fighting with whatever is on the end, but loses the catch.", FALSE, ch, 0, 0, TO_ROOM);
++    return;
++  }	
++
++    if((fish = read_object(o, REAL))!= NULL){
++    fish_s = rand_number(0, fish->obj_flags.value[0]);
++    pole_s = rand_number(0, pole->obj_flags.value[1]+(GET_CRAFT_LEV(ch, FISHING)/10));
++    if (fish_s >= pole_s){
++     send_to_char(ch, "As you reel in your line, it snaps, losing the fish.\r\nTry again?\r\n");
++     act("$n's line breaks causing $m to lose $s catch.", FALSE, ch, 0, 0, TO_ROOM);
++	 extract_obj(fish);
++     return;
++  } 	
++  
++	
++
++    act("Wow! $n reels in a helluva catch! Looks like $p!",
++        FALSE, ch, fish, 0, TO_ROOM);
++    send_to_char(ch, "You reel in %s! Nice catch!\r\n", fish->short_description);
++    add_crafting_exp(ch, (fish->obj_flags.value[0] * 5), FISHING);
++	world[ch->in_room].roomval[4] += 5; // let's slow down bot fishers
++
++       if (can_autosell(ch, fish) == FALSE)
++         obj_to_char(fish, ch);
++	}
++	else {
++     send_to_char(ch, "As you reel in your line, it snaps, losing the fish.\r\nTry again?\r\n");
++     act("$n's line breaks causing $m to lose $s catch.", FALSE, ch, 0, 0, TO_ROOM);
++	}
++ 
++  	if (world[ch->in_room].roomval[4] >= 980){
++		    send_to_char(ch, "`rThe fish have moved on.`n\r\n");	
++	act("The fish have moved on.", FALSE, ch, 0, 0, TO_ROOM);	
++	}
++	    return;	
++}
++
++void load_room_vals(void)
++{
++    char line[MAX_STRING_LENGTH];
++	int retval, t[3];
++	room_rnum room = 0;
++    FILE *fl;
++    struct obj_data *obj;
++
++  if ((fl = fopen(ROOMVAL_FILE, "r")) == NULL)
++    log("SYSERR: Can't read from '%s' roomval file.", ROOMVAL_FILE);
++  else {	
++	
++  while (get_line(fl, line)) {
++    if(*line == '$' && line[1] == '~') {
++     fclose(fl);
++      return;
++      }
++  if ((retval = sscanf(line, "%d %d %d", t, t + 1, t + 2)) != 3) {
++    log("SYSERR: Format error in numeral line of roomvals: %d", retval);
++    continue;
++  } 
++  if (real_room(t[0]) != NOWHERE)
++	room = real_room(t[0]);
++  else
++	continue;
++
++		if (t[1] >= NUM_ROOM_VAL_POSITIONS){
++	    log("SYSERR: Out of bounds value in roomvals. Room: %d, val: %d", t[0], t[1]);		
++			continue;
++		} else {
++       world[room].roomval[t[1]] = t[2];
++		}
++ 	if (world[room].roomval[0] > 0 && world[room].roomval[2] > 0 && real_object(world[room].roomval[0]) != NOTHING) {	
++	 obj = read_object(world[room].roomval[0], VIRTUAL);
++	if (obj->action_description)
++		world[room].resource_name = obj->action_description;
++	else
++		world[room].resource_name = obj->short_description;
++	extract_obj(obj);
++	}		
++	}
++	
++  }
++}
++
++void save_room_vals(void)
++{
++	int i, j;
++    FILE *fl;
++  
++  if ((fl = fopen(ROOMVAL_FILE, "w")) == NULL)
++    log("SYSERR: Can't write to '%s' rommval file.", ROOMVAL_FILE);
++  else {	
++	
++	        for (i = 0; i < top_of_world; i++) {
++			for (j = 0; j < NUM_ROOM_VAL_POSITIONS; j++) {	
++	if (world[i].roomval[j] != 0)			
++    fprintf( fl, "%d %d %d\n", world[i].number, j, world[i].roomval[j]);
++      }				
++	}
++               fprintf(fl, "$~\r\n");
++               fclose( fl );  	
++  }
++}
++
++ACMD(do_rval) {
++	char arg[MAX_INPUT_LENGTH], arg2[MAX_INPUT_LENGTH];
++	int rv;
++two_arguments(argument, arg, arg2);
++
++if (!*arg || !*arg2){
++	send_to_char(ch, "wtf? which val, what to");
++	return;
++}
++rv = atoi(arg);
++if (rv < 0 || rv >= NUM_ROOM_VAL_POSITIONS){ 
++	send_to_char(ch, "wtf? thats not a room value? which val, what to");
++	return;
++}
++
++world[ch->in_room].roomval[rv] = atoi(arg2);
++	send_to_char(ch, "set!");
++}
++
++void update_room_vals()
++{
++	room_rnum i;
++	obj_rnum o;
++    struct char_data *tch;
++	int counter, counted;
++	
++	        for (i = 0; i < top_of_world; i++) {
++			if (world[i].roomval[0] > 0)			
++              world[i].roomval[3] += 1;
++
++			if (world[i].roomval[3] > 482){  // 482 = 4 days
++			world[i].roomval[1] = 0;
++			} // abandoned crop		  
++		  
++	if(world[i].roomval[3] > 1000) {
++	    world[i].resource_name = "";
++        world[i].roomval[0]	= 0;
++        world[i].roomval[1]	= 0;
++        world[i].roomval[2]	= 0;
++        world[i].roomval[3]	= 0;
++	}		  
++	
++// fishing	
++	 if (IS_SET_AR(world[i].room_flags, ROOM_FWFISH) || IS_SET_AR(world[i].room_flags, ROOM_SWFISH) || \
++	 (world[i].sector_type == SECT_WATER_SWIM) || (world[i].sector_type == SECT_WATER_NOSWIM)) {
++	
++    if (world[i].roomval[4] > 0)
++	   world[i].roomval[4] -= 1;		
++
++  if (world[i].people && world[i].roomval[4] < 150){
++	  for (tch = world[i].people; tch; tch = tch->next_in_room) { 
++	      switch (rand_number(0,3)) {
++   case 0:
++   	  act("You hear a splash in the water.", FALSE, tch, 0, 0, TO_CHAR);
++	  break;
++   case 1:			  
++	  act("A fish jumps from the water and splashes back in.", FALSE, tch, 0, 0, TO_CHAR);
++	  break;
++	   default:			  
++	  act("The water stirs with life.", FALSE, tch, 0, 0, TO_CHAR);
++	  break; 
++    }	
++	  }	
++ }
++	 } // end fishing	
++
++// woodcutting gotta grow a tree...		
++ if (numseeds == 0) {
++   save_room_vals();
++   return;
++ }   
++ if(world[i].roomval[0] == 0 && rand_number(0, 2000) == 1000) {
++ if (world[i].sector_type == SECT_FOREST || world[i].sector_type == SECT_FIELD) {
++	   if (numseeds == 0)
++	     continue;
++	   counter = rand_number(1, numseeds);
++	   counted = 0;
++     for (o = 0; o <= top_of_objt; o++) {
++	  if(obj_proto[o].obj_flags.type_flag == ITEM_SEED)
++         counted++;
++	  if (counted == counter)
++		 break;
++	 }
++	 
++	  if (world[i].sector_type == obj_proto[o].obj_flags.value[3] && rand_number(0, 100) >= obj_proto[o].obj_flags.value[1]) {
++        world[i].roomval[0]	= obj_index[o].vnum;
++        world[i].roomval[1]	= 0; //owners id
++        world[i].roomval[2]	= rand_number(3, 15);
++        world[i].roomval[3]	= 0;	//timer	  
++	    if (obj_proto[o].action_description)
++          world[i].resource_name = obj_proto[o].action_description;
++	    else
++		  world[i].resource_name = obj_proto[o].short_description;
++   }
++   }
++ } // done with plants
++ } // done looking thru rooms
++ save_room_vals();
++} 
++
++void reset_mineshafts()
++{
++	int dnum, counted, counter;
++	room_rnum rrnum = NOWHERE;
++	obj_rnum o;
++	
++    count_obj_by_type();
++	if (numores == 0)
++	 return;	
++	for (rrnum = 0; rrnum < top_of_world; rrnum++) {
++  if (world[rrnum].sector_type == SECT_MINESHAFT) {			
++
++  for (dnum = 0; dnum < NUM_OF_DIRS; dnum++) {
++    if (world[rrnum].dir_option[dnum])
++      world[rrnum].dir_option[dnum] = NULL;	
++   } 			
++
++			if (num_pc_in_room(&(world[rrnum])) >= 1) { // if someone is in the room, leave it alone
++		        send_to_room(rrnum, "The mine walls shift as the tunnels collapse!\r\n");
++				continue;
++		}
++	  
++  if (world[rrnum].roomval[0] == 0) {
++	  counted = rand_number(1, numores);
++      counter = 0;	  
++  for (o = 0; o <= top_of_objt; o++) {
++	  if(obj_proto[o].obj_flags.type_flag == ITEM_ORE)
++	     counter++;
++	  if(counted == counter)
++         break;	
++  }	 
++	  if(rand_number(0, 100) >= obj_proto[o].obj_flags.value[1]) {
++        world[rrnum].roomval[0]	= obj_index[o].vnum;
++        world[rrnum].roomval[1]	= obj_proto[o].obj_flags.value[2]; //exp given
++        world[rrnum].roomval[2]	= rand_number (1, MAX(obj_proto[o].obj_flags.value[0], 2));
++        world[rrnum].roomval[3]	= 1;	//timer	  
++        world[rrnum].resource_name = obj_proto[o].short_description;
++	 }
++    }
++   }   
++  }   
++ }
++
++
++void update_actions(void) {
++	
++	struct descriptor_data *d;
++	struct char_data *ch;
++	struct obj_data *tool = NULL, *reward = NULL;
++	int action, i, dir, rmsg = rand_number(1, 8);
++    obj_rnum rnum = NOTHING, o;	
++	bool found = FALSE;
++    char buf[MAX_STRING_LENGTH];
++  
++    room_rnum rrnum = NOWHERE;
++
++	for (d = descriptor_list; d; d = d->next) {
++		if (STATE(d) != CON_PLAYING || !(ch = d->character) || IS_NPC(ch) || GET_ACTION(ch) == ACT_NONE)
++			continue;
++		
++		if (GET_ACTION(ch) >= MAX_ACTIONS) {
++	    send_to_char(ch, "Something buggered up\r\n");		
++			GET_ACTION(ch) = ACT_NONE;
++		     continue;
++	}
++	
++    if (FIGHTING(ch)) {
++    send_to_char(ch, "You can't be fighting and %s the the same time!\r\n", action_types[GET_ACTION(ch)]);
++			GET_ACTION(ch) = ACT_NONE;
++		     continue;
++  }		
++	
++  if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch)) {
++    send_to_char(ch, "Your hands are full, and you stop %s\r\n", action_types[GET_ACTION(ch)]);
++			GET_ACTION(ch) = ACT_NONE;
++		     continue;
++  }
++  
++found = FALSE;				
++switch (GET_ACTION(ch)) {
++case ACT_CHOPPING:
++					if(world[ch->in_room].roomval[2] <= 0) {
++							GET_ACTION(ch) = ACT_NONE;
++						act("The area seems to be depleted!", FALSE, ch, 0, 0, TO_CHAR);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 	
++    world[ch->in_room].resource_name = "";
++						continue;
++						}
++
++            if (!(tool = GET_TOOL(ch, TOOL_AXE)) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_AXE) {
++						send_to_char(ch, "You need to be using an axe.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "As you swing your axe into the tree it breaks, rendering it useless!\r\n");
++	act("As $n swings $p into the tree, it breaks!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_ROOM);
++	extract_obj(untool_char(ch, TOOL_AXE));
++    GET_ACTION(ch) = ACT_NONE;	
++	continue;
++  }	
++  
++  
++     for (o = 0; o <= top_of_objt; o++) { 
++       if(obj_index[o].vnum == world[ch->in_room].roomval[0])
++		  break;
++	 }  
++   
++action = (rand_number(0, 110));
++if ((GET_CRAFT_LEV(ch, WOODWORKING) + GET_OBJ_VAL(tool, 1) + 10) < (obj_proto[o].obj_flags.value[2] + action)) {	
++action = (rand_number(0, 50));
++if (action > 45) {
++	act("You swing $p, but miss the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_CHAR);
++	act("$n swings $p, but misses the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_ROOM);
++} else {
++	GET_OBJ_VAL(tool, 2) -= 1;
++	act("You swing $p hard into the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_CHAR);
++	act("$n swings $p hard into the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_ROOM);
++  }
++  
++ } else {
++ 	GET_OBJ_VAL(tool, 2) -= 1;
++	act("You swing $p hard into the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_CHAR);
++	act("$n swings $p hard into the tree!", FALSE, ch, GET_TOOL(ch, TOOL_AXE), 0, TO_ROOM);
++	
++		
++  if (rand_number(0,20) == 16) {
++      if (real_object(world[ch->in_room].roomval[0]) != NOTHING)
++        rnum = real_object(world[ch->in_room].roomval[0]);
++      else {
++     send_to_char(ch, "bad reward\r\n");
++      log( "SYSERR: bad reward %d.", world[ch->in_room].roomval[0]);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++	GET_ACTION(ch) = ACT_NONE;
++  continue;
++}
++    reward = read_object(rnum, REAL);	  
++	act("You get $p from the tree!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from the tree!", FALSE, ch, reward, 0, TO_ROOM);
++	add_crafting_exp(ch, obj_proto[o].obj_flags.value[2], WOODWORKING);
++
++       if (can_autosell(ch, reward) == FALSE) {
++         obj_to_char(reward, ch);
++  }
++  } else {
++      if (real_object(obj_proto[o].obj_flags.value[0]) != NOTHING)
++    rnum = real_object(obj_proto[o].obj_flags.value[0]);
++      else {
++     send_to_char(ch, "bad seed\r\n");
++      log( "SYSERR: bad seed %d.", obj_index[o].vnum);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++	GET_ACTION(ch) = ACT_NONE;
++  continue;
++}
++    reward = read_object(rnum, REAL);	  
++	act("You get $p from the tree!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from the tree!", FALSE, ch, reward, 0, TO_ROOM);	
++    add_crafting_exp(ch, obj_proto[o].obj_flags.value[2], WOODWORKING);
++	world[ch->in_room].roomval[2]--;
++  
++       if (can_autosell(ch, reward) == FALSE)
++         obj_to_char(reward, ch);
++  }					
++					if(world[ch->in_room].roomval[2] <= 0) {
++						act("With a loud crack, the tree falls and the area is depleted!", FALSE, ch, 0, 0, TO_CHAR);
++						act("With a loud crack, the tree falls and the area is depleted!", FALSE, ch, 0, 0, TO_ROOM);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++		GET_ACTION(ch) = ACT_NONE;
++						}
++ 
++  }
++				break;
++				
++case ACT_FARMING:
++					if(world[ch->in_room].roomval[2] <= 0) {
++							GET_ACTION(ch) = ACT_NONE;
++						act("This area seems to be depleted!", FALSE, ch, 0, 0, TO_CHAR);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 	
++	world[ch->in_room].resource_name = "";
++						continue;
++						}
++						
++            if (!(tool = GET_TOOL(ch, TOOL_HOE)) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_HOE) {
++						send_to_char(ch, "You need to be using a hoe.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "As you dig with your hoe it breaks, rendering it useless!\r\n");
++	act("As $n digs with $s $p it breaks!", FALSE, ch, GET_TOOL(ch, TOOL_HOE), 0, TO_ROOM);
++	extract_obj(untool_char(ch, TOOL_HOE));
++    GET_ACTION(ch) = ACT_NONE;	
++	continue;
++  }	
++  
++action = (rand_number(0, 110));
++
++     for (o = 0; o <= top_of_objt; o++) { 
++       if(obj_index[o].vnum == world[ch->in_room].roomval[0])
++		  break;
++	 } 
++	 
++if ((GET_CRAFT_LEV(ch, FARMING) + GET_OBJ_VAL(tool, 1) + 10) < (obj_proto[o].obj_flags.value[2] + action)) {		
++	GET_OBJ_VAL(tool, 2) -= 1;
++	act("You dig at the crop!", FALSE, ch, 0, 0, TO_CHAR);
++	act("$n works hard at harvesting!", FALSE, ch, 0, 0, TO_ROOM);
++ } else {
++ 	GET_OBJ_VAL(tool, 2) -= 1;
++	act("You dig at the crop!", FALSE, ch, 0, 0, TO_CHAR);
++	act("$n works hard at harvesting!", FALSE, ch, 0, 0, TO_ROOM);
++  
++  
++  if (rand_number(1,20) == 16) {
++      if (real_object(world[ch->in_room].roomval[0]) != NOTHING) {
++            rnum = real_object(world[ch->in_room].roomval[0]);
++  }  else {
++     send_to_char(ch, "bad reward\r\n");
++      log( "SYSERR: bad reward %d.", world[ch->in_room].roomval[0]);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++	GET_ACTION(ch) = ACT_NONE;
++  continue;
++}
++    reward = read_object(rnum, REAL);	  
++	act("You get $p from your hard work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from $s hard work!", FALSE, ch, reward, 0, TO_ROOM);
++	add_crafting_exp(ch, obj_proto[o].obj_flags.value[2], FARMING);
++	world[ch->in_room].roomval[2]--;
++    
++       if (can_autosell(ch, reward) == FALSE) {
++         obj_to_char(reward, ch); 
++		 continue;
++	   }
++  } else {
++      if (real_object(obj_proto[o].obj_flags.value[0]) != NOTHING)
++         rnum = real_object(obj_proto[o].obj_flags.value[0]);
++      else {
++     send_to_char(ch, "bad seed\r\n");
++      log( "SYSERR: bad seed %d.", obj_index[o].vnum);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++	GET_ACTION(ch) = ACT_NONE;
++  continue;
++}
++    reward = read_object(rnum, REAL);	  
++	act("You get $p from the crop!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from the crop!", FALSE, ch, reward, 0, TO_ROOM);	
++	add_crafting_exp(ch, obj_proto[o].obj_flags.value[2], FARMING);
++	world[ch->in_room].roomval[2]--;
++    
++       if (can_autosell(ch, reward) == FALSE)
++         obj_to_char(reward, ch);
++  }	
++    if(world[ch->in_room].roomval[2] <= 0) {			
++	act("With that the area is depleted!", FALSE, ch, 0, 0, TO_CHAR);
++	act("With that the area is depleted!", FALSE, ch, 0, 0, TO_ROOM);
++	world[ch->in_room].roomval[0] = 0;
++	world[ch->in_room].roomval[1] = 0;  
++	world[ch->in_room].roomval[2] = 0;
++	world[ch->in_room].roomval[3] = 0; 
++	world[ch->in_room].resource_name = "";
++	GET_ACTION(ch) = ACT_NONE;
++						}
++ }	
++	break;				
++case ACT_PLANTING:
++            if (!(tool = GET_TOOL(ch, TOOL_HOE)) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_HOE) {
++						send_to_char(ch, "You need to be using a hoe.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++					
++		if (GET_ACTION_TIMER(ch) > 0) {
++						act("You till the ground!", FALSE, ch, 0, 0, TO_CHAR);
++						act("$n tills the ground!", FALSE, ch, 0, 0, TO_ROOM);
++						GET_ACTION_TIMER(ch)--;
++		} else {
++	                    reward = read_object(GET_ACTION_REWARD(ch), VIRTUAL);
++	                    act("You plant $p into the ground!", FALSE, ch, reward, 0, TO_CHAR);
++						world[ch->in_room].resource_name = reward->action_description;
++						act("$n plants a seed here!", FALSE, ch, 0, 0, TO_ROOM);
++									 GET_ACTION(ch) = ACT_NONE;
++						world[ch->in_room].roomval[0] = GET_ACTION_REWARD(ch);
++						world[ch->in_room].roomval[1] = GET_IDNUM(ch);
++					    world[ch->in_room].roomval[2] = rand_number(1, 15);
++						GET_ACTION_REWARD(ch) = NOTHING;
++						add_crafting_exp(ch, GET_OBJ_VAL(reward, 2), FARMING);
++			            extract_obj(reward);
++		}
++				break;				
++				
++case ACT_FISHING:
++            if (!(tool = GET_TOOL(ch, TOOL_FISHINGPOLE)) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_FISHINGPOLE) {
++						send_to_char(ch, "You need to be using a pole.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++ if (!IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_FWFISH) && !IS_SET_AR(world[IN_ROOM(ch)].room_flags, ROOM_SWFISH) &&
++ (world[IN_ROOM(ch)].sector_type != SECT_WATER_SWIM) && (world[IN_ROOM(ch)].sector_type != SECT_WATER_NOSWIM)) {
++	  send_to_char(ch, "Apparently you can't fish here.\r\n"); 
++      GET_ACTION(d->character) = ACT_NONE;
++   }
++	if ((world[d->character->in_room].roomval[4] >= 1000))
++      action = rand_number(11, 40);
++ 	else if ((world[d->character->in_room].roomval[4] >= 950))
++      action = rand_number(4, 40); 
++	else
++      action = rand_number(1, 40);
++
++     if (action <= 8) {
++       SET_BIT_AR(PLR_FLAGS(ch), PLR_FISHON);
++	   send_to_char(ch, "You feel a very solid pull on your line!\r\n");
++      } else if (action <= 10) {
++       send_to_char(d->character, "You feel a slight jiggle on your line.\r\n");	   
++      } else if (action <= 15) {
++        send_to_char(d->character, "Time goes by... not even a nibble.\r\n"); 
++      }
++				break;
++				
++case ACT_WOODWORKING:
++	if (GET_ACTION_TIMER(ch) > 0) {
++						act("You carve at your project!", FALSE, ch, 0, 0, TO_CHAR);
++						GET_ACTION_TIMER(ch)--;	
++						
++      if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad carving reward\r\n");
++     log( "SYSERR: bad carving reward %d.", GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++	 
++	 
++  if (assemblyGetTool(GET_ACTION_REWARD(ch)) != -1) {
++            if ((!(tool = GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch)))) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != assemblyGetTool(GET_ACTION_REWARD(ch)))) {
++						send_to_char(ch, "You need to be using a good %s.\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++						
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "Your %s breaks, rendering it useless!\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++	act("$n's $p breaks!", FALSE, ch, GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch))), 0, TO_ROOM);
++	extract_obj(untool_char(ch, assemblyGetTool(GET_ACTION_REWARD(ch))));
++    GET_ACTION(ch) = ACT_NONE;	
++	assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));
++	GET_ACTION_REWARD(ch) = NOTHING;
++	continue;
++  }	
++  }
++
++  	if (rand_number(0, 10) <= 2){
++	 if (real_object(SHAVINGS) != NOTHING) {
++       rnum = real_object(SHAVINGS);
++       reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	
++	 } else {
++      send_to_char(ch, "bad object sawdust\r\n");
++      log( "SYSERR: bad object sawdust.");
++    }
++		  if (!OBJ_FLAGGED(reward, ITEM_WOODEN))
++			  extract_obj(reward);
++		  else {
++	extract_obj(reward);		  
++    reward = read_object(rnum, REAL);	  
++	act("You get $p from your wood!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their wood!", FALSE, ch, reward, 0, TO_ROOM);							
++						obj_to_char(reward, ch);
++		  }						
++	}
++
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), WOODWORKING);	
++			for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++	act("You get $p from your work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their work!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++			}
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++	break;	
++	
++	
++case ACT_MIXING:
++  
++	if (GET_ACTION_TIMER(ch) > 0) {
++						act("You slowly stir ingredients into your vial!", FALSE, ch, 0, 0, TO_CHAR);
++						GET_ACTION_TIMER(ch)--;	
++						
++      if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad mixing reward\r\n");
++     log( "SYSERR: bad mixing reward %d.", GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), APOTHECARY);
++		for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++	act("You get $p from your work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their work!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++	}
++  
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++break; 	
++	
++case ACT_SCRIBING:
++  
++	if (GET_ACTION_TIMER(ch) > 0) {
++						act("You meticulously scribe on the paper!", FALSE, ch, 0, 0, TO_CHAR);
++						GET_ACTION_TIMER(ch)--;	
++						
++      if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad scribing reward\r\n");
++     log( "SYSERR: bad scribing reward %d.", GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), SCRIBING);	
++			for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++	act("You get $p from your work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their work!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++			}
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++break; 	
++	
++
++case ACT_MINING:
++
++if (SECT(ch->in_room) != SECT_MINESHAFT || world[d->character->in_room].roomval[0] == 0) {
++     send_to_char(ch, "Nothing here to mine.\r\n");
++	 GET_ACTION(ch) = ACT_NONE;
++    continue;
++  }
++
++            if (!(tool = GET_TOOL(ch, TOOL_PICK)) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != TOOL_PICK) {
++						send_to_char(ch, "You need to be using a mining pick.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++						
++    GET_OBJ_VAL(tool, 2) -= world[ch->in_room].roomval[1];
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "As you swing your pick, it breaks, rendering it useless!\r\n");
++	act("As $n swings their $p, it breaks!", FALSE, ch, GET_TOOL(ch, TOOL_PICK), 0, TO_ROOM);
++	extract_obj(untool_char(ch, TOOL_PICK));
++    GET_ACTION(ch) = ACT_NONE;	
++	continue;
++  }	
++
++						
++  if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch)) {
++    send_to_char(ch, "Your hands are full, and you stop %s\r\n", action_types[GET_ACTION(ch)]);
++			GET_ACTION(ch) = ACT_NONE;
++		     continue;
++  }						
++
++	 if (world[ch->in_room].roomval[2] <= 0) {
++		GET_ACTION(ch) = ACT_NONE;
++		world[ch->in_room].roomval[0] = 0;
++		world[ch->in_room].roomval[1] = 0;
++		world[ch->in_room].roomval[2] = 0;
++		world[ch->in_room].roomval[3] = 0;
++    	send_to_char(ch, "The vein is depleted.\r\n");	
++	    world[ch->in_room].resource_name = "";
++	    continue;
++	   }
++ 
++    	rnum = real_object(world[IN_ROOM(ch)].roomval[0]);
++
++ 	if (rnum == NOTHING) {
++		GET_ACTION(ch) = ACT_NONE;
++		world[ch->in_room].roomval[0] = 0;
++		world[ch->in_room].roomval[1] = 0;
++		world[ch->in_room].roomval[2] = 0;
++		world[ch->in_room].roomval[3] = 0;
++	send_to_char(ch, "Something buggered up. no such object.\r\n");	
++	    world[ch->in_room].resource_name = "";
++	continue;
++	}
++
++  if (GET_MOVE(ch) <= 2) {
++    send_to_char(ch, "You get tired and stop %s\r\n", action_types[GET_ACTION(ch)]);
++			GET_ACTION(ch) = ACT_NONE;
++			
++		     continue;
++  }
++  
++	 GET_MOVE(ch) -= 1;
++   
++	 if (GET_ACTION_TIMER(ch) > 0) {
++       send_to_char(ch, "You dig and dig and seem to get nowhere.\r\n");
++       GET_ACTION_TIMER(ch)--;
++       continue;
++     }
++	
++     reward = read_object(rnum, REAL);
++     send_to_char(ch, "You dig up %s.\r\n", reward->short_description);
++     act("$n digs up what looks like $p!", FALSE, ch, reward, 0, TO_ROOM);
++	 
++	 
++    if (can_autosell(ch, reward) == FALSE)
++     obj_to_char(reward, ch); 
++    
++	add_crafting_exp(ch, world[IN_ROOM(ch)].roomval[1] , MINING);
++	if (world[ch->in_room].roomval[2] > 0)
++	  world[ch->in_room].roomval[2]--;
++
++	GET_ACTION_TIMER(ch) = rand_number(1, (12 - GET_OBJ_VAL(tool, 1)));
++
++break;	
++
++case ACT_SMELTING:
++  if (!(get_obj_in_list_vis(ch, "forge", NULL, world[IN_ROOM(ch)].contents))) {
++    send_to_char(ch, "The forge seems to have moved!\r\n");
++	assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));	
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++  }	
++
++	if (GET_ACTION_TIMER(ch) > 0) {
++		act("You wait and wait as the room seemingly gets hotter!", FALSE, ch, 0, 0, TO_CHAR);
++		GET_ACTION_TIMER(ch)--;	
++							
++	if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad smelting reward\r\n");
++     log( "SYSERR: bad smelting reward %d.", GET_ACTION_REWARD(ch));
++	 assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++ 
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), SMITHING);	
++			for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++ 	act("You get $p from the forge!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from the forge!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++			}
++			
++	break_mould(ch);
++			
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++ break;
++
++case ACT_SMITHING:
++
++	if (GET_ACTION_TIMER(ch) > 0) {
++	    act("You swing $p into your project, as it slowly takes shape!", FALSE, ch, GET_TOOL(ch, TOOL_HAMMER), 0, TO_CHAR);
++		GET_ACTION_TIMER(ch)--;	
++							
++	if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad smithing reward\r\n");
++     log( "SYSERR: bad smithing reward %d.", GET_ACTION_REWARD(ch));
++	 assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));	 
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++ 
++	if (!(get_obj_in_list_vis(ch, "anvil", NULL, world[IN_ROOM(ch)].contents))) {
++     send_to_char(ch, "The anvil seems to have moved!\r\n");
++	 assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++  }	 
++	 
++	if (assemblyGetTool(GET_ACTION_REWARD(ch)) != -1) {
++            if ((!(tool = GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch)))) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != assemblyGetTool(GET_ACTION_REWARD(ch)))) {
++						send_to_char(ch, "You need to be using a good %s.\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++	                    assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));						
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++	if (GET_OBJ_VAL(tool, 2) <= 0) {
++      send_to_char(ch, "Your %s breaks, rendering it useless!\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++	  act("$n's $p breaks!", FALSE, ch, GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch))), 0, TO_ROOM);
++	  extract_obj(untool_char(ch, assemblyGetTool(GET_ACTION_REWARD(ch))));
++      GET_ACTION(ch) = ACT_NONE;	
++	  assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));
++	  GET_ACTION_REWARD(ch) = NOTHING;
++	  continue;
++  }	
++  }	 
++
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), SMITHING);	
++			for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++	act("You get $p from your work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their work!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++			}
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++ break;
++
++case ACT_CRAFTING:
++
++	if (GET_ACTION_TIMER(ch) > 0) {
++						act("Your project slowly takes shape!", FALSE, ch, 0, 0, TO_CHAR);
++						GET_ACTION_TIMER(ch)--;	
++						
++						
++						
++      if (real_object(GET_ACTION_REWARD(ch)) != NOTHING)
++        rnum = real_object(GET_ACTION_REWARD(ch));
++      else {
++     send_to_char(ch, "bad crafting reward\r\n");
++     log( "SYSERR: bad crafting reward %d.", GET_ACTION_REWARD(ch));
++	 GET_ACTION(ch) = ACT_NONE;
++     continue;
++     }
++	 
++  if (assemblyGetTool(GET_ACTION_REWARD(ch)) != -1) {
++            if ((!(tool = GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch)))) ||
++                 (GET_OBJ_TYPE(tool) != ITEM_TOOL) || GET_OBJ_VAL(tool, 0) != assemblyGetTool(GET_ACTION_REWARD(ch)))) {
++						send_to_char(ch, "You need to be using a good %s.\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++						
++  if (GET_OBJ_VAL(tool, 2) <= 0) {
++    send_to_char(ch, "Your %s breaks, rendering it useless!\r\n", tool_types[assemblyGetTool(GET_ACTION_REWARD(ch))]);
++	act("$n's $p breaks!", FALSE, ch, GET_TOOL(ch, assemblyGetTool(GET_ACTION_REWARD(ch))), 0, TO_ROOM);
++	extract_obj(untool_char(ch, assemblyGetTool(GET_ACTION_REWARD(ch))));
++    GET_ACTION(ch) = ACT_NONE;	
++	assemblyReturnComponents(ch, GET_ACTION_REWARD(ch));
++	GET_ACTION_REWARD(ch) = NOTHING;
++	continue;
++  }	
++  }	 
++
++	} else {
++    add_crafting_exp(ch, assemblyGetExp(GET_ACTION_REWARD(ch)), CRAFTING);	
++			for (i=0; i<assemblyGetHowmany(GET_ACTION_REWARD(ch)); i++){
++    reward = read_object(real_object(GET_ACTION_REWARD(ch)), REAL);	  
++	act("You get $p from your work!", FALSE, ch, reward, 0, TO_CHAR);
++	act("$n gets $p from their work!", FALSE, ch, reward, 0, TO_ROOM);		
++	
++    if (can_autosell(ch, reward) == FALSE)
++      obj_to_char(reward, ch);
++			}
++    GET_ACTION_REWARD(ch) = NOTHING;
++    GET_ACTION(ch) = ACT_NONE;
++    continue;
++		 }
++break;
++
++
++
++case ACT_DIGGING:
++
++        if ((!(tool = GET_TOOL(ch, TOOL_PICK)) || GET_OBJ_VAL(tool, 2) <= 0)) {
++						send_to_char(ch, "You need to be using a good pick.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 
++						
++        if (world[IN_ROOM(ch)].sector_type != SECT_MINESHAFT){						
++						send_to_char(ch, "You can only dig in the mines.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						} 						
++
++  dir = GET_ACTION_REWARD(ch);						
++						
++		if(W_EXIT(IN_ROOM(ch), dir)){
++ 						send_to_char(ch, "Someone has beaten you to it.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						}
++						
++		if(GET_MOVE(ch) <= 2) {						
++ 						send_to_char(ch, "You're too tired to continue.\r\n");
++						GET_ACTION(ch) = ACT_NONE;
++						continue;
++						}
++						
++GET_OBJ_VAL(tool, 2) -=1;
++
++	if (GET_OBJ_VAL(tool, 2) <= 0) {
++     send_to_char(ch, "As you bring your pick down into the ground, it breaks, rendering it useless!\r\n");
++	 act("$n's $p breaks!", FALSE, ch, GET_TOOL(ch, TOOL_PICK), 0, TO_ROOM);
++	 extract_obj(untool_char(ch, TOOL_PICK));
++     GET_ACTION(ch) = ACT_NONE;	
++	 continue;
++  }	
++GET_ACTION_TIMER(ch)--;
++GET_MOVE(ch) -= 1;
++						
++if (GET_ACTION_TIMER(ch) > 0) {
++if (rmsg == 1)
++send_to_room(IN_ROOM(ch), "%s strikes down on the dirt with %s as they mine.\r\n",
++GET_NAME(ch), tool->short_description);
++else if (rmsg == 2)
++send_to_room(IN_ROOM(ch), "The echoing sounds of mining pass through the distance.\r\n");
++else if (rmsg == 3)
++send_to_room(IN_ROOM(ch), "%s brings their pick down and strikes some hard ore, sending vibrations through %s.\r\n",
++GET_NAME(ch), tool->short_description);
++else if (rmsg == 4)
++send_to_room(IN_ROOM(ch), "As %s strikes the ground, a large cloud of dirt engulfs the area.\r\n", GET_NAME(ch));
++else if (rmsg == 5)
++send_to_room(IN_ROOM(ch), "The rough work begins to take wear on %s's gloves.\r\n", GET_NAME(ch));
++else if (rmsg == 6)
++send_to_room(IN_ROOM(ch), "Sweat drips down %s's forehead as they take another swing with their pick.\r\n", GET_NAME(ch));
++else if (rmsg == 7)
++send_to_room(IN_ROOM(ch), "Rocks begin to fly as %s picks away at the wall.\r\n", GET_NAME(ch));
++else
++send_to_room(IN_ROOM(ch), "Dig Dig Dig, all day long, Dig Dig Dig while I sing this song...\r\n");
++} else {
++rnum = 0;
++do {
++  rrnum = rand_number(0, top_of_world);
++  rnum++;
++} while ((world[rrnum].sector_type != SECT_MINESHAFT || W_EXIT(rrnum, rev_dir[dir])) && rnum < 100000);
++
++if (rnum >= 100000) {
++reset_mineshafts();
++
++ // all should be good to just grab a random room
++do {
++  rrnum = rand_number(0, top_of_world);
++} while (world[rrnum].sector_type != SECT_MINESHAFT);
++rnum = NOTHING;
++}	
++							
++	
++	  /* Now dig. */
++  CREATE(W_EXIT(IN_ROOM(ch), dir), struct room_direction_data, 1);
++  W_EXIT(IN_ROOM(ch), dir)->general_description = NULL;
++  W_EXIT(IN_ROOM(ch), dir)->keyword = NULL;
++  W_EXIT(IN_ROOM(ch), dir)->to_room = rrnum;
++
++  send_to_char(ch, "You tunnel %s into `c%s`n.\r\n", dirs[dir], world[rrnum].name);
++  snprintf(buf, sizeof(buf), "$n tunnels %s into `c%s`n.", dirs[dir], world[rrnum].name);
++       act(buf, FALSE, ch, 0, 0, TO_ROOM);
++
++  /* Check if we can dig from there to here. */
++  if (W_EXIT(rrnum, rev_dir[dir]))
++    send_to_char(ch, "The target room already has an exit to the %s.\r\n", dirs[rev_dir[dir]]);
++  else {
++    CREATE(W_EXIT(rrnum, rev_dir[dir]), struct room_direction_data, 1);
++    W_EXIT(rrnum, rev_dir[dir])->general_description = NULL;
++    W_EXIT(rrnum, rev_dir[dir])->keyword = NULL;
++    W_EXIT(rrnum, rev_dir[dir])->to_room = IN_ROOM(ch);
++    send_to_room(rrnum, "The wall on the %s collapses as a new opening appears..", dirs[rev_dir[dir]]);	
++  }
++						GET_ACTION_REWARD(ch) = NOTHING;
++						GET_ACTION(ch) = ACT_NONE;
++						add_crafting_exp(ch, 1, MINING);  
++}
++		     break;
++			 
++default:
++send_to_char(d->character, "Whatever you were doing didn't work.\r\n");
++			 GET_ACTION(ch) = ACT_NONE;
++		     break;
++			 
++		}
++	}
++}
++
++void free_assemblies(void)
++{
++
++/*while (g_lNumAssemblies) {
++  if( g_pAssemblyTable[ g_lNumAssemblies ].pComponents != NULL )
++    free( g_pAssemblyTable[ g_lNumAssemblies ].pComponents );	
++  g_lNumAssemblies-=1;
++}*/
++free( g_pAssemblyTable );
++}
++
++#undef __ASSEMBLIES_C__
+\ No newline at end of file
+diff -ruN tbamudmaster/src/comm.c tbamudmasterad/src/comm.c
+--- tbamudmaster/src/comm.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/comm.c	2026-02-07 13:48:15.553653400 -0600
+@@ -82,6 +82,7 @@
+ #include "quest.h"
+ #include "ibt.h" /* for free_ibt_lists */
+ #include "mud_event.h"
++#include "assemblies.h"
+ 
+ #ifndef INVALID_SOCKET
+ #define INVALID_SOCKET (-1)
+@@ -366,6 +367,8 @@
+     free_recent_players();  /* act.informative.c */
+     free_list(world_events); /* free up our global lists */
+     free_list(global_lists);
++    free_objbank(); /* shop.c */
++	free_assemblies();
+   }
+ 
+   if (last_act_message)
+@@ -541,8 +544,11 @@
+ 
+   CLOSE_SOCKET(mother_desc);
+ 
+-  if (circle_reboot != 2)
++  if (circle_reboot != 2) {
+     save_all();
++    save_objbank();
++    save_room_vals();
++}
+ 
+   log("Saving current MUD time.");
+   save_mud_time(&time_info);
+@@ -1017,6 +1023,14 @@
+   if (!(heart_pulse % PULSE_TIMESAVE))
+   save_mud_time(&time_info);
+ 
++  if (!(heart_pulse % (301 * PASSES_PER_SEC))){  // offset so everything isnt updating at the tic time
++	update_room_vals();
++	save_objbank();
++  }
++
++  if (!(heart_pulse % (7199 * PASSES_PER_SEC))) // 2 hours
++  	  reset_mineshafts();
++
+   /* Every pulse! Don't want them to stink the place up... */
+   extract_pending_chars();
+ }
+@@ -2124,6 +2138,7 @@
+     case CON_HEDIT:
+     case CON_QEDIT:
+     case CON_MSGEDIT:
++    case CON_ASSEDIT:	
+       cleanup_olc(d, CLEANUP_ALL);
+       break;
+     default:
+diff -ruN tbamudmaster/src/constants.c tbamudmasterad/src/constants.c
+--- tbamudmaster/src/constants.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/constants.c	2026-02-06 23:57:18.300888000 -0600
+@@ -83,6 +83,8 @@
+   "OLC",
+   "*",				/* The BFS Mark. */
+   "WORLDMAP",
++  "FRESHWFISH",
++  "SALTWFISH",  
+   "\n"
+ };
+ 
+@@ -125,6 +127,68 @@
+   "Water (No Swim)",
+   "In Flight",
+   "Underwater",
++  "Mineshaft",
++  "\n"
++};
++
++const char *action_types[] =
++{
++  "nothing",
++  "chopping",
++  "fishing",
++  "farming",
++  "planting",
++  "baking",
++  "forging",
++  "smelting",
++  "glassblowing",
++  "crafting",
++  "farming", 
++  "woodworking",
++  "smithing",
++  "mining",
++  "digging",  
++  "mixing", 
++  "scribing", 
++  "\n"
++};
++
++const char *tool_types[] =
++{
++  "fishing pole",
++  "hoe",
++  "axe",
++  "knife", 
++  "hammer",
++  "chisel",
++  "spinning wheel",
++  "mining pick",
++  "needle",
++  "glass pipe", 
++  "\n"
++};
++
++/* Constants for Assemblies    *****************************************/
++const char *AssemblyTypes[] = {
++  "craft",
++  "scribe",
++  "mix",
++  "carve", 
++  "smith",  
++  "smelt",
++  "\n"
++};
++
++/* experice for assemblies and fishing    *****************************************/
++const char *CraftingTypes[] = {
++  "scribing",
++  "fishing",
++  "apothecary",
++  "crafting",
++  "farming",  
++  "woodworking",
++  "smithing",
++  "mining",  
+   "\n"
+ };
+ 
+@@ -179,7 +243,7 @@
+   "IBT_BUG",
+   "IBT_IDEA",
+   "IBT_TYPO",
+-  "UNUSED1",
++  "FISHON",
+   "UNUSED2",
+   "UNUSED3",
+   "UNUSED4",
+@@ -253,6 +317,8 @@
+   "AUTOKEY",
+   "AUTODOOR",
+   "ZONERESETS",
++  "VERBOSE",  
++  "AUTOSELL",
+   "\n"
+ };
+ 
+@@ -323,6 +389,7 @@
+   "Preference edit",
+   "IBT edit",
+   "Message edit",
++  "Assembly edit",
+   "Protocol Detection",
+   "\n"
+ };
+@@ -404,6 +471,11 @@
+   "PEN",
+   "BOAT",
+   "FOUNTAIN",
++  "TOOL",
++  "SEED",
++  "ORE",
++  "FWFISH",
++  "SWFISH",
+   "\n"
+ };
+ 
+@@ -451,6 +523,7 @@
+   "ANTI_WARRIOR",
+   "NO_SELL",
+   "QUEST_ITEM",
++  "WOODEN",
+   "\n"
+ };
+ 
+@@ -497,6 +570,8 @@
+   "\n",
+ };
+ 
++
++
+ /** Describes the liquid description.
+  * @pre Must be in the same order as the defines.
+  * Must end array with a single newline. */
+diff -ruN tbamudmaster/src/constants.h tbamudmasterad/src/constants.h
+--- tbamudmaster/src/constants.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/constants.h	2026-02-06 22:42:22.463661400 -0600
+@@ -19,6 +19,10 @@
+ extern const char *zone_bits[];
+ extern const char *exit_bits[];
+ extern const char *sector_types[];
++extern const char *action_types[];
++extern const char *tool_types[];
++extern const char *AssemblyTypes[];
++extern const char *CraftingTypes[];
+ extern const char *genders[];
+ extern const char *position_types[];
+ extern const char *player_bits[];
+diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
+--- tbamudmaster/src/handler.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/handler.c	2026-02-06 22:36:44.133179200 -0600
+@@ -504,6 +504,19 @@
+ {
+   int j;
+ 
++
++ if (GET_OBJ_TYPE(obj) == ITEM_TOOL){
++ if (GET_TOOL(ch, GET_OBJ_VAL(obj, 0))){
++	       act("You unequip $p.",
++		  FALSE, ch, GET_TOOL(ch, GET_OBJ_VAL(obj, 0)), 0, TO_CHAR);
++		 obj_to_char(untool_char(ch, GET_OBJ_VAL(obj, 0)), ch);	  
++ }
++  GET_TOOL(ch, GET_OBJ_VAL(obj, 0)) = obj;
++  obj->worn_by = ch;
++  obj->worn_on = WEAR_HOLD;
++  return;
++ }
++ 
+   if (pos < 0 || pos >= NUM_WEARS) {
+     core_dump();
+     return;
+@@ -588,6 +601,23 @@
+   return (obj);
+ }
+ 
++struct obj_data *untool_char(struct char_data *ch, int pos)
++{
++  struct obj_data *obj;
++
++  if ((pos < 0 || pos >= MAX_TOOLS) || GET_TOOL(ch, pos) == NULL) {
++    core_dump();
++    return (NULL);
++  }
++
++  obj = GET_TOOL(ch, pos);
++  obj->worn_by = NULL;
++  obj->worn_on = -1;
++
++  GET_TOOL(ch, pos) = NULL;
++  return (obj);
++}
++
+ int get_number(char **name)
+ {
+   int i;
+@@ -791,7 +821,11 @@
+   struct obj_data *temp;
+ 
+   if (obj->worn_by != NULL)
+-    if (unequip_char(obj->worn_by, obj->worn_on) != obj)
++    if (GET_OBJ_TYPE(obj) == ITEM_TOOL){
++		if (untool_char(obj->worn_by, GET_OBJ_VAL(obj, 0)) != obj)
++      log("SYSERR: Inconsistent tool worn_by and worn_on pointers!!");
++	}  
++    else if (unequip_char(obj->worn_by, obj->worn_on) != obj)
+       log("SYSERR: Inconsistent worn_by and worn_on pointers!!");
+   if (IN_ROOM(obj) != NOWHERE)
+     obj_from_room(obj);
+@@ -1226,6 +1260,26 @@
+   return (NULL);
+ }
+ 
++struct obj_data *get_obj_in_toolbelt_vis(struct char_data *ch, char *arg, int *number, struct obj_data *equipment[])
++{
++  int j, num;
++
++  if (!number) {
++    number = &num;
++    num = get_number(&arg);
++  }
++
++  if (*number == 0)
++    return (NULL);
++
++  for (j = 0; j < MAX_TOOLS; j++)
++    if (equipment[j] && CAN_SEE_OBJ(ch, equipment[j]) && isname(arg, equipment[j]->name))
++      if (--(*number) == 0)
++        return (equipment[j]);
++
++  return (NULL);
++}
++
+ int get_obj_pos_in_equip_vis(struct char_data *ch, char *arg, int *number, struct obj_data *equipment[])
+ {
+   int j, num;
+@@ -1242,6 +1296,26 @@
+     if (equipment[j] && CAN_SEE_OBJ(ch, equipment[j]) && isname(arg, equipment[j]->name))
+       if (--(*number) == 0)
+         return (j);
++
++  return (-1);
++}
++
++int get_obj_pos_in_toolbelt_vis(struct char_data *ch, char *arg, int *number, struct obj_data *equipment[])
++{
++  int j, num;
++
++  if (!number) {
++    number = &num;
++    num = get_number(&arg);
++  }
++
++  if (*number == 0)
++    return (-1);
++
++  for (j = 0; j < MAX_TOOLS; j++)
++    if (equipment[j] && CAN_SEE_OBJ(ch, equipment[j]) && isname(arg, equipment[j]->name))
++      if (--(*number) == 0)
++        return (j);
+ 
+   return (-1);
+ }
+diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
+--- tbamudmaster/src/interpreter.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/interpreter.c	2026-02-07 13:50:57.475668200 -0600
+@@ -37,6 +37,7 @@
+ #include "prefedit.h"
+ #include "ibt.h"
+ #include "mud_event.h"
++#include "assemblies.h"
+ 
+ /* local (file scope) functions */
+ static int perform_dupe_check(struct descriptor_data *d);
+@@ -88,6 +89,7 @@
+   { "areas"    , "are"     , POS_DEAD    , do_areas    , 0, 0 },
+   { "assist"   , "as"      , POS_FIGHTING, do_assist   , 1, 0 },
+   { "ask"      , "ask"     , POS_RESTING , do_spec_comm, 0, SCMD_ASK },
++  { "assedit"  ,"assedit" , POS_STANDING, do_assedit   , LVL_IMPL, 0},   
+   { "astat"    , "ast"     , POS_DEAD    , do_astat    , 0, 0 },
+   { "attach"   , "attach"  , POS_DEAD    , do_attach   , LVL_BUILDER, 0 },
+   { "auction"  , "auc"     , POS_SLEEPING, do_gen_comm , 0, SCMD_AUCTION },
+@@ -112,10 +114,13 @@
+   { "bug"      , "bug"     , POS_DEAD    , do_ibt      , 0, SCMD_BUG },
+ 
+   { "cast"     , "c"       , POS_SITTING , do_cast     , 1, 0 },
++  { "castout"  , "ca"      , POS_SITTING , do_castout  , 0, 0 },
++  { "carve"    , "car"     , POS_STANDING, do_assemble   , 0, SCMD_CARVE},  
+   { "cedit"    , "cedit"   , POS_DEAD    , do_oasis_cedit, LVL_IMPL, 0 },
+   { "changelog", "cha"     , POS_DEAD    , do_changelog, LVL_IMPL, 0 },
+   { "check"    , "ch"      , POS_STANDING, do_not_here , 1, 0 },
+   { "checkload", "checkl"  , POS_DEAD    , do_checkloadstatus, LVL_GOD, 0 },
++  { "chop"     ,"cho"      , POS_STANDING, do_chop     , 0, 0 },    
+   { "close"    , "cl"      , POS_SITTING , do_gen_door , 0, SCMD_CLOSE },
+   { "clear"    , "cle"     , POS_DEAD    , do_gen_ps   , 0, SCMD_CLEAR },
+   { "cls"      , "cls"     , POS_DEAD    , do_gen_ps   , 0, SCMD_CLEAR },
+@@ -123,6 +128,7 @@
+   { "commands" , "com"     , POS_DEAD    , do_commands , 0, SCMD_COMMANDS },
+   { "compact"  , "comp"    , POS_DEAD    , do_gen_tog  , 0, SCMD_COMPACT },
+   { "copyover" , "copyover", POS_DEAD    , do_copyover , LVL_GRGOD, 0 },
++  { "craft"    ,"cr"       , POS_SITTING , do_assemble , 0, SCMD_CRAFT },   
+   { "credits"  , "cred"    , POS_DEAD    , do_gen_ps   , 0, SCMD_CREDITS },
+ 
+   { "date"     , "da"      , POS_DEAD    , do_date     , LVL_IMMORT, SCMD_DATE },
+@@ -168,6 +174,7 @@
+ 
+   { "help"     , "h"       , POS_DEAD    , do_help     , 0, 0 },
+   { "happyhour", "ha"      , POS_DEAD    , do_happyhour, 0, 0 },
++  { "harvest"  , "har"     , POS_STANDING, do_harvest  , 0, 0 },   
+   { "hedit"    , "hedit"   , POS_DEAD    , do_oasis_hedit, LVL_GOD , 0 },
+   { "helpcheck", "helpch"  , POS_DEAD    , do_helpcheck, LVL_GOD, 0 },
+   { "hide"     , "hi"      , POS_RESTING , do_hide     , 1, 0 },
+@@ -208,6 +215,8 @@
+   { "map"      , "map"     , POS_STANDING, do_map      , 1, 0 },
+   { "medit"    , "med"     , POS_DEAD    , do_oasis_medit, LVL_BUILDER, 0 },
+   { "mlist"    , "mlist"   , POS_DEAD    , do_oasis_list, LVL_BUILDER, SCMD_OASIS_MLIST },
++  { "mine"     ,"mi"       , POS_STANDING, do_mine     , 0, 0 },
++  { "mix"      ,"mix"      , POS_STANDING, do_assemble , 0, SCMD_MIX },   
+   { "mcopy"    , "mcopy"   , POS_DEAD    , do_oasis_copy, LVL_GOD, CON_MEDIT },
+   { "msgedit"  , "msgedit" , POS_DEAD    , do_msgedit,   LVL_GOD, 0 },
+   { "mute"     , "mute"    , POS_DEAD    , do_wizutil  , LVL_GOD, SCMD_MUTE },
+@@ -239,6 +248,7 @@
+   { "practice" , "pr"      , POS_RESTING , do_practice , 1, 0 },
+   { "page"     , "pag"     , POS_DEAD    , do_page     , 1, 0 },
+   { "pardon"   , "pardon"  , POS_DEAD    , do_wizutil  , LVL_GOD, SCMD_PARDON },
++  { "plant"   ,"plant"     , POS_STANDING, do_plant    , 0, 0 },   
+   { "plist"    , "plist"   , POS_DEAD    , do_plist    , LVL_GOD, 0 },
+   { "policy"   , "pol"     , POS_DEAD    , do_gen_ps   , 0, SCMD_POLICIES },
+   { "pour"     , "pour"    , POS_STANDING, do_pour     , 0, SCMD_POUR },
+@@ -262,6 +272,7 @@
+   { "recite"   , "reci"    , POS_RESTING , do_use      , 0, SCMD_RECITE },
+   { "receive"  , "rece"    , POS_STANDING, do_not_here , 1, 0 },
+   { "recent"   , "recent"  , POS_DEAD    , do_recent   , LVL_IMMORT, 0 },
++  { "reelin"   , "reel"    , POS_SITTING , do_reelin   , 0, 0 },  
+   { "remove"   , "rem"     , POS_RESTING , do_remove   , 0, 0 },
+   { "rent"     , "rent"    , POS_STANDING, do_not_here , 1, 0 },
+   { "report"   , "repo"    , POS_RESTING , do_report   , 0, 0 },
+@@ -279,6 +290,7 @@
+   { "score"    , "sc"      , POS_DEAD    , do_score    , 0, 0 },
+   { "scan"     , "sca"     , POS_RESTING , do_scan     , 0, 0 },
+   { "scopy"    , "scopy"   , POS_DEAD    , do_oasis_copy, LVL_GOD, CON_SEDIT },
++  { "scribe"   ,"scr"      , POS_STANDING, do_assemble , 0, SCMD_SCRIBE }, 
+   { "sit"      , "si"      , POS_RESTING , do_sit      , 0, 0 },
+   { "'"        , "'"       , POS_RESTING , do_say      , 0, 0 },
+   { "save"     , "sav"     , POS_SLEEPING, do_save     , 0, 0 },
+@@ -295,6 +307,8 @@
+   { "skillset" , "skillset", POS_SLEEPING, do_skillset , LVL_GRGOD, 0 },
+   { "sleep"    , "sl"      , POS_SLEEPING, do_sleep    , 0, 0 },
+   { "slist"    , "slist"   , POS_SLEEPING, do_oasis_list, LVL_BUILDER, SCMD_OASIS_SLIST },
++  { "smelt"    ,"sm"      , POS_STANDING , do_assemble , 0, SCMD_SMELT },   
++  { "smith"    ,"smi"     , POS_STANDING , do_assemble , 0, SCMD_SMITH },   
+   { "sneak"    , "sneak"   , POS_STANDING, do_sneak    , 1, 0 },
+   { "snoop"    , "snoop"   , POS_DEAD    , do_snoop    , LVL_GOD, 0 },
+   { "socials"  , "socials" , POS_DEAD    , do_commands , 0, SCMD_SOCIALS },
+@@ -1339,6 +1353,7 @@
+     { CON_PREFEDIT, prefedit_parse },
+     { CON_IBTEDIT, ibtedit_parse },
+     { CON_MSGEDIT, msgedit_parse },
++    { CON_ASSEDIT, assedit_parse },	
+     { -1, NULL }
+   };
+ 
+@@ -1613,7 +1628,7 @@
+       write_to_output(d, "\r\nThat's not a class.\r\nClass: ");
+       return;
+     } else
+-      GET_CLASS(d->character) = load_result;
++       GET_CLASS(d->character) = load_result;
+ 
+       if (d->olc) {
+         free(d->olc);
+diff -ruN tbamudmaster/src/oasis.c tbamudmasterad/src/oasis.c
+--- tbamudmaster/src/oasis.c	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/oasis.c	2026-02-07 13:52:48.476256800 -0600
+@@ -205,6 +205,9 @@
+     else if (STATE(d) == CON_HEDIT)
+       mudlog(CMP, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)),
+        TRUE, "OLC: %s stops editing help files.", GET_NAME(d->character));
++    else if (STATE(d) == CON_ASSEDIT)
++      mudlog(CMP, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)),
++       TRUE, "OLC: %s stops editing assembly files.", GET_NAME(d->character));		   
+     else
+       mudlog(CMP, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)),
+         TRUE, "OLC: %s stops editing zone %d allowed zone %d", 
+diff -ruN tbamudmaster/src/oasis.h tbamudmasterad/src/oasis.h
+--- tbamudmaster/src/oasis.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/oasis.h	2026-02-06 22:16:31.654999800 -0600
+@@ -108,6 +108,7 @@
+   int item_type;
+   struct trig_proto_list *script; /* for assigning triggers in [r|o|m]edit*/
+   struct help_index_element*help;   /* Hedit uses this */
++  struct assembly_data *OlcAssembly;  
+ };
+ 
+ /* Exported globals. */
+@@ -136,6 +137,7 @@
+ #define OLC_HELP(d)    (OLC(d)->help)     /**< Hedit structure      */
+ #define OLC_PREFS(d)   (OLC(d)->prefs)    /**< Preferences structure */
+ #define OLC_IBT(d)     (OLC(d)->ibt)      /**< IBT (idea/bug/typo) structure */
++#define OLC_ASSEDIT(d) (OLC(d)->OlcAssembly)   /* assembly olc 	*/
+ /* Other macros. */
+ #define OLC_EXIT(d)    (OLC_ROOM(d)->dir_option[OLC_VAL(d)])
+ #define OLC_MSG(d)     (OLC(d)->m_type)
+@@ -392,6 +394,25 @@
+ #define HEDIT_KEYWORDS                  5
+ #define HEDIT_MIN_LEVEL                 6
+ 
++#define ASSEDIT_DO_NOT_USE              0
++#define ASSEDIT_MAIN_MENU               1
++#define ASSEDIT_ADD_COMPONENT           2
++#define ASSEDIT_EDIT_COMPONENT          3
++#define ASSEDIT_DELETE_COMPONENT        4
++#define ASSEDIT_EDIT_EXTRACT            5
++#define ASSEDIT_EDIT_INROOM             6
++#define ASSEDIT_EDIT_TYPES              7
++#define ASSEDIT_EDIT_LEVEL              8
++#define ASSEDIT_EDIT_EXP                9
++#define ASSEDIT_EDIT_RA                10
++#define ASSEDIT_EDIT_CA                11
++#define ASSEDIT_EDIT_TOOL              12
++
++/* public functions from assedit.c */
++void assedit_parse(struct descriptor_data *d, char *arg);
++ACMD(do_assemble);
++ACMD(do_assedit);
++
+ int  save_config( IDXTYPE nowhere );
+ 
+ /* Prototypes to keep. */
+diff -ruN tbamudmaster/src/shop.h tbamudmasterad/src/shop.h
+--- tbamudmaster/src/shop.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/shop.h	2026-02-07 00:24:26.672642500 -0600
+@@ -28,6 +28,11 @@
+ #define BUY_TYPE(i)		((i).type)
+ #define BUY_WORD(i)		((i).keywords)
+ 
++/* 
++BANK_MAX the amount of items the shop stops buying them
++*/
++#define BANK_MAX 99999
++
+ struct shop_data {
+    room_vnum vnum;		/* Virtual number of this shop		*/
+    obj_vnum *producing;		/* Which item to produce (virtual)	*/
+@@ -53,6 +58,22 @@
+    SPECIAL (*func);		/* Secondary spec_proc for shopkeeper	*/
+ };
+ 
++typedef struct objbank_data OBJBANK_DATA; /* The stuff for the main object bank */
++OBJBANK_DATA *find_objbank_item(struct obj_data *obj);
++OBJBANK_DATA *find_objbank_number(obj_vnum number);
++
++struct objbank_data {
++   OBJBANK_DATA *next;
++   OBJBANK_DATA *prev;
++   obj_vnum vnum;
++   int how_many;
++   int price;
++   int variation;
++   int flux;
++   int alch;
++   short move;
++};
++
+ #define MAX_TRADE	5	/* List maximums for compatibility	*/
+ #define MAX_PROD	5	/*	with shops before v3.0		*/
+ #define VERSION3_TAG	"v3.0"	/* The file has v3.0 shops in it!	*/
+@@ -131,6 +152,7 @@
+ #define WILL_START_FIGHT    (1 << 0)
+ #define WILL_BANK_MONEY     (1 << 1)
+ #define HAS_UNLIMITED_CASH  (1 << 2)
++#define USES_OBJBANK        (1 << 3)
+ /** Total number of shop flags */
+ #define NUM_SHOP_FLAGS    3
+ 
+@@ -149,10 +171,25 @@
+ #define MSG_NO_SELL_CLASS	"We don't serve your kind here!"
+ #define MSG_NO_USED_WANDSTAFF	"I don't buy used up wands or staves!"
+ #define MSG_CANT_KILL_KEEPER	"Get out of here before I call the guards!"
++#define MSG_NO_USED_TOOLS	"I don't buy used tools!"
+ 
+ /* Global variables */
+ 
+ extern const char *trade_letters[];
+ extern const char *shop_bits[];
+ 
++void restock_shops(void); 
++void do_shop_stat_object(struct char_data *ch, struct obj_data *j);
++int find_shop(int);
++int bsp(int price, bool autosell);
++extern void increase_shop_profit(int amt);
++extern void decrease_shop_profit(int deduction);
++bool can_autosell(struct char_data *ch, struct obj_data *obj);
++void save_room_vals(void);
++void set_objbank_prices(void);
++void load_objbank(void);
++void save_objbank(void);
++void shopping_information(char *arg, struct char_data *ch, struct char_data *keeper, int shop_nr); // added by Bart
++void save_objbank(void);
++ACMD(add_objbank);
+ #endif /* _SHOP_H_ */
+diff -ruN tbamudmaster/src/structs.h tbamudmasterad/src/structs.h
+--- tbamudmaster/src/structs.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/structs.h	2026-02-06 23:55:25.902019600 -0600
+@@ -87,8 +87,10 @@
+ #define ROOM_OLC           14   /**< (R) Modifyable/!compress */
+ #define ROOM_BFS_MARK      15   /**< (R) breath-first srch mrk */
+ #define ROOM_WORLDMAP      16   /**< World-map style maps here */
++#define ROOM_FWFISH		   17
++#define ROOM_SWFISH		   18
+ /** The total number of Room Flags */
+-#define NUM_ROOM_FLAGS    17
++#define NUM_ROOM_FLAGS    19
+ 
+ /* Zone info: Used in zone_data.zone_flags */
+ #define ZONE_CLOSED       0  /**< Zone is closed - players cannot enter */
+@@ -119,8 +121,9 @@
+ #define SECT_WATER_NOSWIM    7		/**< Water - need a boat	*/
+ #define SECT_FLYING	         8		/**< Flying			*/
+ #define SECT_UNDERWATER	     9		/**< Underwater		*/
++#define SECT_MINESHAFT      10
+ /** The total number of room Sector Types */
+-#define NUM_ROOM_SECTORS  10
++#define NUM_ROOM_SECTORS  11
+ 
+ /* char and mob-related defines */
+ 
+@@ -202,6 +205,7 @@
+ #define PLR_BUG          17   /**< Player is writing a bug */
+ #define PLR_IDEA         18   /**< Player is writing an idea */
+ #define PLR_TYPO         19   /**< Player is writing a typo */
++#define PLR_FISHON   	 20  /* Player has a fish on their line  */
+ 
+ /* Mobile flags: used by char_data.char_specials.act */
+ #define MOB_SPEC            0   /**< Mob has a callable spec-proc */
+@@ -264,8 +268,9 @@
+ #define PRF_AUTODOOR     33   /**< Use the next available door */
+ #define PRF_ZONERESETS   34   /**< Show when zones reset */
+ #define PRF_VERBOSE      35   /**< Listings like where are more verbose */
++#define PRF_AUTOSELL     36
+ /** Total number of available PRF flags */
+-#define NUM_PRF_FLAGS    36
++#define NUM_PRF_FLAGS    37
+ 
+ /* Affect bits: used in char_data.char_specials.saved.affected_by */
+ /* WARNING: In the world files, NEVER set the bits marked "R" ("Reserved") */
+@@ -328,11 +333,12 @@
+ #define CON_PREFEDIT     29 /**< OLC mode - preference edit */
+ #define CON_IBTEDIT      30 /**< OLC mode - idea/bug/typo edit */
+ #define CON_MSGEDIT      31 /**< OLC mode - message editor */
+-#define CON_GET_PROTOCOL 32 /**< Used at log-in while attempting to get protocols > */
++#define CON_ASSEDIT      32		/* OLC mode - Assemblies	*/
++#define CON_GET_PROTOCOL 33 /**< Used at log-in while attempting to get protocols > */
+ 
+ /* OLC States range - used by IS_IN_OLC and IS_PLAYING */
+ #define FIRST_OLC_STATE CON_OEDIT     /**< The first CON_ state that is an OLC */
+-#define LAST_OLC_STATE  CON_MSGEDIT   /**< The last CON_ state that is an OLC  */
++#define LAST_OLC_STATE  CON_ASSEDIT   /**< The last CON_ state that is an OLC  */
+ 
+ /* Character equipment positions: used as index for char_data.equipment[] */
+ /* NOTE: Don't confuse these constants with the ITEM_ bitvectors
+@@ -385,8 +391,13 @@
+ #define ITEM_PEN       21		/**< Item is a pen		*/
+ #define ITEM_BOAT      22		/**< Item is a boat		*/
+ #define ITEM_FOUNTAIN  23		/**< Item is a fountain		*/
++#define ITEM_TOOL      24  /* Fishing Pole is now a defined tool               */
++#define ITEM_SEED      25
++#define ITEM_ORE       26
++#define ITEM_FWFISH	   27
++#define ITEM_SWFISH    28
+ /** Total number of item types.*/
+-#define NUM_ITEM_TYPES    24
++#define NUM_ITEM_TYPES    29
+ 
+ /* Take/Wear flags: used by obj_data.obj_flags.wear_flags */
+ #define ITEM_WEAR_TAKE      0   /**< Item can be taken */
+@@ -426,8 +437,9 @@
+ #define ITEM_ANTI_WARRIOR     15   /**< Not usable by warriors */
+ #define ITEM_NOSELL           16   /**< Shopkeepers won't touch it */
+ #define ITEM_QUEST            17   /**< Item is a quest item         */
++#define ITEM_WOODEN           18  /** items that burn or make shavings when carved **/
+ /** Total number of item flags */
+-#define NUM_ITEM_FLAGS    18
++#define NUM_ITEM_FLAGS    19
+ 
+ /* Modifier constants used with obj affects ('A' fields) */
+ #define APPLY_NONE              0	/**< No effect			*/
+@@ -513,6 +525,57 @@
+ #define RENT_FORCED     4 /**< Character inv save status = forced rent */
+ #define RENT_TIMEDOUT   5 /**< Character inv save status = timed out */
+ 
++/* for assembly skills such as scribe, mix, fishing */
++/* define the skill, then we can use it elsewhere */
++#define SCRIBING       	0
++#define FISHING        	1
++#define APOTHECARY     	2
++#define CRAFTING       	3
++#define FARMING  		4
++#define WOODWORKING    	5
++#define SMITHING    	6
++#define MINING    		7
++#define MAX_CRAFT_TYPE  8 // this must go last
++
++/* Automatic Actions for craft.c */
++#define ACT_NONE			0
++#define ACT_CHOPPING		1
++#define ACT_FISHING			2
++#define ACT_FARMING			3
++#define ACT_PLANTING		4
++#define ACT_BAKING			5  // unused
++#define ACT_FORGING			6
++#define ACT_SMELTING		7
++#define ACT_GLASS			8  // unused
++#define ACT_CRAFTING		9
++#define ACT_APOTHECARY		10
++#define ACT_WOODWORKING		11
++#define ACT_SMITHING		12
++#define ACT_MINING		    13
++#define ACT_DIGGING		    14
++#define ACT_MIXING		    15
++#define ACT_SCRIBING		16
++#define MAX_ACTIONS			17 // last, 1 higher then the previous
++
++
++/* Tools for the actions */
++#define TOOL_FISHINGPOLE	0
++#define TOOL_HOE			1
++#define TOOL_AXE			2
++#define TOOL_KNIFE			3
++#define TOOL_HAMMER			4
++#define TOOL_CHISEL			5
++#define TOOL_SPINNER		6
++#define TOOL_PICK			7
++#define TOOL_NEEDLE			8
++#define TOOL_GLASSPIPE		9
++#define MAX_TOOLS           10 // goes last of course, 1 higher then the previous
++
++// a find all
++#define GET_CRAFT_LEV(ch, type)	((ch)->player_specials->saved.crafting_level[type])
++#define GET_CRAFT_EXP(ch, type)	((ch)->player_specials->saved.crafting_exp[type])
++
++
+ /* Settings for Bit Vectors */
+ #define RF_ARRAY_MAX    4  /**< # Bytes in Bit vector - Room flags */
+ #define PM_ARRAY_MAX    4  /**< # Bytes in Bit vector - Act and Player flags */
+@@ -787,6 +850,8 @@
+   room_rnum to_room; /**< Where direction leads, or NOWHERE if not defined */
+ };
+ 
++#define NUM_ROOM_VAL_POSITIONS 5
++
+ /** The Room Structure. */
+ struct room_data
+ {
+@@ -798,12 +863,14 @@
+   char *description; /**< Shown when entered, looked at */
+   struct extra_descr_data *ex_description; /**< Additional things to look at */
+   struct room_direction_data *dir_option[NUM_OF_DIRS]; /**< Directions */
++  char *resource_name; /**< Shown when entered, like an object. A vein producing resource_name is here */   
+   byte light;        /**< Number of lightsources in room */
+   SPECIAL(*func);    /**< Points to special function attached to room */
+   struct trig_proto_list *proto_script; /**< list of default triggers */
+   struct script_data *script; /**< script info for the room */
+   struct obj_data *contents;  /**< List of items in room */
+   struct char_data *people;   /**< List of NPCs / PCs in room */
++  int roomval[NUM_ROOM_VAL_POSITIONS];  
+   
+   struct list_data * events;  
+ };
+@@ -949,6 +1016,8 @@
+   int pref[PR_ARRAY_MAX]; /**< preference flags */
+   ubyte bad_pws;          /**< number of bad login attempts */
+   sbyte conditions[3];    /**< Drunk, hunger, and thirst */
++  int crafting_level[MAX_CRAFT_TYPE];	/* array of assemblies plus skill 0	and fishing	*/
++  int crafting_exp[MAX_CRAFT_TYPE];	/* array of assemblies plus skill 0	and fishing	*/  
+   struct txt_block *comm_hist[NUM_HIST]; /**< Communication history */
+   ubyte page_length;      /**< Max number of rows of text to send at once */
+   ubyte screen_width;     /**< How wide the display page is */
+@@ -979,6 +1048,9 @@
+   int last_olc_mode;     /**< ? Currently Unused ? */
+   char *host;            /**< Resolved hostname, or ip, for player. */
+   int buildwalk_sector;  /**< Default sector type for buildwalk */
++  int action;
++  int action_timer; 
++  obj_vnum reward;
+ };
+ 
+ /** Special data used by NPCs, not PCs */
+@@ -1030,7 +1102,8 @@
+ 
+   struct affected_type *affected;        /**< affected by what spells    */
+   struct obj_data *equipment[NUM_WEARS]; /**< Equipment array            */
+-
++  struct obj_data *toolbelt[MAX_TOOLS]; /* Equipment array               */  
++  
+   struct obj_data *carrying;    /**< List head for objects in inventory */
+   struct descriptor_data *desc; /**< Descriptor/connection info; NPCs = NULL */
+ 
+diff -ruN tbamudmaster/src/utils.h tbamudmasterad/src/utils.h
+--- tbamudmaster/src/utils.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/utils.h	2026-02-06 22:55:10.888735400 -0600
+@@ -494,6 +494,10 @@
+ /** Sex of ch. */
+ #define GET_SEX(ch)	((ch)->player.sex)
+ 
++#define GET_ACTION(ch)			CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->action))
++#define GET_ACTION_TIMER(ch)	CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->action_timer))
++#define GET_ACTION_REWARD(ch)	CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->reward))
++
+ /** Current strength of ch. */
+ #define GET_STR(ch)     ((ch)->aff_abils.str)
+ /** Current strength modifer of ch. */
+@@ -624,6 +628,7 @@
+ 
+ /** Get obj worn in position i on ch. */
+ #define GET_EQ(ch, i)		((ch)->equipment[i])
++#define GET_TOOL(ch, i)		((ch)->toolbelt[i])
+ 
+ /** If ch is a mob, return the special function, else return NULL. */
+ #define GET_MOB_SPEC(ch)	(IS_MOB(ch) ? mob_index[(ch)->nr].func : NULL)
