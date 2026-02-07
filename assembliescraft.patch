@@ -1,6 +1,17 @@
+diff -ruN tbamudmaster/src/act.h tbamudmasterad/src/act.h
+--- tbamudmaster/src/act.h	2026-02-03 17:55:59.000000000 -0600
++++ tbamudmasterad/src/act.h	2026-02-07 16:01:11.496238900 -0600
+@@ -103,6 +103,7 @@
+ ACMD(do_where);
+ ACMD(do_who);
+ ACMD(do_whois);
++ACMD(do_professions);
+ 
+ /*****************************************************************************
+  * Begin Functions and defines for act.item.c
 diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.c
 --- tbamudmaster/src/act.informative.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/act.informative.c	2026-02-07 13:46:50.454084400 -0600
++++ tbamudmasterad/src/act.informative.c	2026-02-07 16:02:23.865555900 -0600
 @@ -28,6 +28,7 @@
  #include "modify.h"
  #include "asciimap.h"
@@ -131,6 +142,26 @@ diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.
          if (d->connected == CON_AEDIT)
            send_to_char(ch, " (Social Edit)");
          if (d->connected == CON_CEDIT)
+@@ -2733,3 +2796,18 @@
+     send_to_char(ch, "You don't see anything nearby!\r\n");
+   }
+ } // end of do_scan
++
++ACMD(do_professions)
++{
++	int i, count = 0;
++	
++    for (i = 0; i < MAX_CRAFT_TYPE; i++){
++	send_to_char(ch, "%11s: %3d, Tnl: %-6d    ", CraftingTypes[i], GET_CRAFT_LEV(ch, i),  (((GET_CRAFT_LEV(ch, i)+1) * 1000)- GET_CRAFT_EXP(ch, i)));
++	count++;
++	if (count >= 2){
++		count = 0;
++ send_to_char(ch, "\r\n");
++	}
++	}
++ send_to_char(ch, "\r\n");	
++}
+\ No newline at end of file
 diff -ruN tbamudmaster/src/assedit.c tbamudmasterad/src/assedit.c
 --- tbamudmaster/src/assedit.c	1969-12-31 18:00:00.000000000 -0600
 +++ tbamudmasterad/src/assedit.c	2026-02-06 22:18:55.644354900 -0600
@@ -3459,7 +3490,7 @@ diff -ruN tbamudmaster/src/constants.h tbamudmasterad/src/constants.h
  extern const char *player_bits[];
 diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
 --- tbamudmaster/src/handler.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/handler.c	2026-02-06 22:36:44.133179200 -0600
++++ tbamudmasterad/src/handler.c	2026-02-07 16:06:32.242478000 -0600
 @@ -504,6 +504,19 @@
  {
    int j;
@@ -3504,20 +3535,24 @@ diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
  int get_number(char **name)
  {
    int i;
-@@ -791,7 +821,11 @@
+@@ -790,9 +820,14 @@
+   struct char_data *ch, *next = NULL;
    struct obj_data *temp;
  
-   if (obj->worn_by != NULL)
+-  if (obj->worn_by != NULL)
 -    if (unequip_char(obj->worn_by, obj->worn_on) != obj)
++  if (obj->worn_by != NULL) {
 +    if (GET_OBJ_TYPE(obj) == ITEM_TOOL){
 +		if (untool_char(obj->worn_by, GET_OBJ_VAL(obj, 0)) != obj)
 +      log("SYSERR: Inconsistent tool worn_by and worn_on pointers!!");
 +	}  
 +    else if (unequip_char(obj->worn_by, obj->worn_on) != obj)
        log("SYSERR: Inconsistent worn_by and worn_on pointers!!");
++  }
    if (IN_ROOM(obj) != NOWHERE)
      obj_from_room(obj);
-@@ -1226,6 +1260,26 @@
+   else if (obj->carried_by)
+@@ -1226,6 +1261,26 @@
    return (NULL);
  }
  
@@ -3544,7 +3579,7 @@ diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
  int get_obj_pos_in_equip_vis(struct char_data *ch, char *arg, int *number, struct obj_data *equipment[])
  {
    int j, num;
-@@ -1242,6 +1296,26 @@
+@@ -1242,6 +1297,26 @@
      if (equipment[j] && CAN_SEE_OBJ(ch, equipment[j]) && isname(arg, equipment[j]->name))
        if (--(*number) == 0)
          return (j);
@@ -3573,7 +3608,7 @@ diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
  }
 diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
 --- tbamudmaster/src/interpreter.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/interpreter.c	2026-02-07 13:50:57.475668200 -0600
++++ tbamudmasterad/src/interpreter.c	2026-02-07 15:59:56.733248200 -0600
 @@ -37,6 +37,7 @@
  #include "prefedit.h"
  #include "ibt.h"
@@ -3629,7 +3664,7 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
    { "mcopy"    , "mcopy"   , POS_DEAD    , do_oasis_copy, LVL_GOD, CON_MEDIT },
    { "msgedit"  , "msgedit" , POS_DEAD    , do_msgedit,   LVL_GOD, 0 },
    { "mute"     , "mute"    , POS_DEAD    , do_wizutil  , LVL_GOD, SCMD_MUTE },
-@@ -239,6 +248,7 @@
+@@ -239,9 +248,11 @@
    { "practice" , "pr"      , POS_RESTING , do_practice , 1, 0 },
    { "page"     , "pag"     , POS_DEAD    , do_page     , 1, 0 },
    { "pardon"   , "pardon"  , POS_DEAD    , do_wizutil  , LVL_GOD, SCMD_PARDON },
@@ -3637,7 +3672,11 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
    { "plist"    , "plist"   , POS_DEAD    , do_plist    , LVL_GOD, 0 },
    { "policy"   , "pol"     , POS_DEAD    , do_gen_ps   , 0, SCMD_POLICIES },
    { "pour"     , "pour"    , POS_STANDING, do_pour     , 0, SCMD_POUR },
-@@ -262,6 +272,7 @@
++  { "professions"   ,"pro" , POS_DEAD    , do_professions    , 0, 0 },  
+   { "prompt"   , "pro"     , POS_DEAD    , do_display  , 0, 0 },
+   { "prefedit" , "pre"     , POS_DEAD    , do_oasis_prefedit , 0, 0 },
+   { "purge"    , "purge"   , POS_DEAD    , do_purge    , LVL_BUILDER, 0 },
+@@ -262,6 +273,7 @@
    { "recite"   , "reci"    , POS_RESTING , do_use      , 0, SCMD_RECITE },
    { "receive"  , "rece"    , POS_STANDING, do_not_here , 1, 0 },
    { "recent"   , "recent"  , POS_DEAD    , do_recent   , LVL_IMMORT, 0 },
@@ -3645,7 +3684,7 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
    { "remove"   , "rem"     , POS_RESTING , do_remove   , 0, 0 },
    { "rent"     , "rent"    , POS_STANDING, do_not_here , 1, 0 },
    { "report"   , "repo"    , POS_RESTING , do_report   , 0, 0 },
-@@ -279,6 +290,7 @@
+@@ -279,6 +291,7 @@
    { "score"    , "sc"      , POS_DEAD    , do_score    , 0, 0 },
    { "scan"     , "sca"     , POS_RESTING , do_scan     , 0, 0 },
    { "scopy"    , "scopy"   , POS_DEAD    , do_oasis_copy, LVL_GOD, CON_SEDIT },
@@ -3653,7 +3692,7 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
    { "sit"      , "si"      , POS_RESTING , do_sit      , 0, 0 },
    { "'"        , "'"       , POS_RESTING , do_say      , 0, 0 },
    { "save"     , "sav"     , POS_SLEEPING, do_save     , 0, 0 },
-@@ -295,6 +307,8 @@
+@@ -295,6 +308,8 @@
    { "skillset" , "skillset", POS_SLEEPING, do_skillset , LVL_GRGOD, 0 },
    { "sleep"    , "sl"      , POS_SLEEPING, do_sleep    , 0, 0 },
    { "slist"    , "slist"   , POS_SLEEPING, do_oasis_list, LVL_BUILDER, SCMD_OASIS_SLIST },
@@ -3662,7 +3701,7 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
    { "sneak"    , "sneak"   , POS_STANDING, do_sneak    , 1, 0 },
    { "snoop"    , "snoop"   , POS_DEAD    , do_snoop    , LVL_GOD, 0 },
    { "socials"  , "socials" , POS_DEAD    , do_commands , 0, SCMD_SOCIALS },
-@@ -1339,6 +1353,7 @@
+@@ -1339,6 +1354,7 @@
      { CON_PREFEDIT, prefedit_parse },
      { CON_IBTEDIT, ibtedit_parse },
      { CON_MSGEDIT, msgedit_parse },
@@ -3670,7 +3709,7 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
      { -1, NULL }
    };
  
-@@ -1613,7 +1628,7 @@
+@@ -1613,7 +1629,7 @@
        write_to_output(d, "\r\nThat's not a class.\r\nClass: ");
        return;
      } else
