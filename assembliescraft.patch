@@ -1182,7 +1182,7 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +  {
 +    /* Copy the old table over to the new. */
 +    memmove( pNewComponents, pAssembly->pComponents, pAssembly->lNumComponents * sizeof( COMPONENT ) );
-+//    free( pAssembly->pComponents );
++    free( pAssembly->pComponents );
 +  }
 +
 +  /*
@@ -1196,7 +1196,7 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +  pAssembly->pComponents[ pAssembly->lNumComponents ].chow_many = how_many;
 +  pAssembly->lNumComponents += 1;
 +  
-+free( pNewComponents );
++//free( pNewComponents );
 +  return (TRUE);
 +}
 +
@@ -3313,6 +3313,7 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +free( g_pAssemblyTable );
 +}
 +
+
 +#undef __ASSEMBLIES_C__
 \ No newline at end of file
 diff -ruN tbamudmaster/src/comm.c tbamudmasterad/src/comm.c
