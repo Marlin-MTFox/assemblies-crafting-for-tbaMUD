@@ -1,6 +1,6 @@
-diff -ruN tbamudmaster/src/act.h tbamudmasterad/src/act.h
---- tbamudmaster/src/act.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/act.h	2026-02-07 16:01:11.496238900 -0600
+diff -ruN src/act.h srcad/act.h
+--- src/act.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/act.h	2026-02-07 16:01:11.496238900 -0600
 @@ -103,6 +103,7 @@
  ACMD(do_where);
  ACMD(do_who);
@@ -9,9 +9,9 @@ diff -ruN tbamudmaster/src/act.h tbamudmasterad/src/act.h
  
  /*****************************************************************************
   * Begin Functions and defines for act.item.c
-diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.c
---- tbamudmaster/src/act.informative.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/act.informative.c	2026-02-07 17:03:32.773591400 -0600
+diff -ruN src/act.informative.c srcad/act.informative.c
+--- src/act.informative.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/act.informative.c	2026-02-07 17:03:32.773591400 -0600
 @@ -28,6 +28,7 @@
  #include "modify.h"
  #include "asciimap.h"
@@ -195,9 +195,9 @@ diff -ruN tbamudmaster/src/act.informative.c tbamudmasterad/src/act.informative.
 + send_to_char(ch, "\r\n");	
 +}
 \ No newline at end of file
-diff -ruN tbamudmaster/src/assedit.c tbamudmasterad/src/assedit.c
---- tbamudmaster/src/assedit.c	1969-12-31 18:00:00.000000000 -0600
-+++ tbamudmasterad/src/assedit.c	2026-02-06 22:18:55.644354900 -0600
+diff -ruN src/assedit.c srcad/assedit.c
+--- src/assedit.c	1969-12-31 18:00:00.000000000 -0600
++++ srcad/assedit.c	2026-02-06 22:18:55.644354900 -0600
 @@ -0,0 +1,557 @@
 +/* ******************************************************************** *
 + * FILE : assedit.c                     Copyright (C) 1999 Del Minturn  *
@@ -756,9 +756,9 @@ diff -ruN tbamudmaster/src/assedit.c tbamudmasterad/src/assedit.c
 +  send_to_char(d->character, "     : assedit delete <vnum>\r\n");
 +  return;
 +}
-diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
---- tbamudmaster/src/assemblies.c	1969-12-31 18:00:00.000000000 -0600
-+++ tbamudmasterad/src/assemblies.c	2026-02-08 08:13:40.907413000 -0600
+diff -ruN src/assemblies.c srcad/assemblies.c
+--- src/assemblies.c	1969-12-31 18:00:00.000000000 -0600
++++ srcad/assemblies.c	2026-02-08 08:13:40.907413000 -0600
 @@ -0,0 +1,2553 @@
 +/* ******************************************************************** *
 + * FILE	: assemblies.c     				Copyright (C) 1999 Geoff Davis	*
@@ -3314,9 +3314,9 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +
 +#undef __ASSEMBLIES_C__
 \ No newline at end of file
-diff -ruN tbamudmaster/src/comm.c tbamudmasterad/src/comm.c
---- tbamudmaster/src/comm.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/comm.c	2026-02-07 13:48:15.553653400 -0600
+diff -ruN src/comm.c srcad/comm.c
+--- src/comm.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/comm.c	2026-02-07 13:48:15.553653400 -0600
 @@ -82,6 +82,7 @@
  #include "quest.h"
  #include "ibt.h" /* for free_ibt_lists */
@@ -3370,9 +3370,9 @@ diff -ruN tbamudmaster/src/comm.c tbamudmasterad/src/comm.c
        cleanup_olc(d, CLEANUP_ALL);
        break;
      default:
-diff -ruN tbamudmaster/src/constants.c tbamudmasterad/src/constants.c
---- tbamudmaster/src/constants.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/constants.c	2026-02-06 23:57:18.300888000 -0600
+diff -ruN src/constants.c srcad/constants.c
+--- src/constants.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/constants.c	2026-02-06 23:57:18.300888000 -0600
 @@ -83,6 +83,8 @@
    "OLC",
    "*",				/* The BFS Mark. */
@@ -3506,9 +3506,9 @@ diff -ruN tbamudmaster/src/constants.c tbamudmasterad/src/constants.c
  /** Describes the liquid description.
   * @pre Must be in the same order as the defines.
   * Must end array with a single newline. */
-diff -ruN tbamudmaster/src/constants.h tbamudmasterad/src/constants.h
---- tbamudmaster/src/constants.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/constants.h	2026-02-06 22:42:22.463661400 -0600
+diff -ruN src/constants.h srcad/constants.h
+--- src/constants.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/constants.h	2026-02-06 22:42:22.463661400 -0600
 @@ -19,6 +19,10 @@
  extern const char *zone_bits[];
  extern const char *exit_bits[];
@@ -3520,9 +3520,9 @@ diff -ruN tbamudmaster/src/constants.h tbamudmasterad/src/constants.h
  extern const char *genders[];
  extern const char *position_types[];
  extern const char *player_bits[];
-diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
---- tbamudmaster/src/handler.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/handler.c	2026-02-07 16:06:32.242478000 -0600
+diff -ruN src/handler.c srcad/handler.c
+--- src/handler.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/handler.c	2026-02-07 16:06:32.242478000 -0600
 @@ -504,6 +504,19 @@
  {
    int j;
@@ -3638,9 +3638,9 @@ diff -ruN tbamudmaster/src/handler.c tbamudmasterad/src/handler.c
  
    return (-1);
  }
-diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
---- tbamudmaster/src/interpreter.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/interpreter.c	2026-02-07 15:59:56.733248200 -0600
+diff -ruN src/interpreter.c srcad/interpreter.c
+--- src/interpreter.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/interpreter.c	2026-02-07 15:59:56.733248200 -0600
 @@ -37,6 +37,7 @@
  #include "prefedit.h"
  #include "ibt.h"
@@ -3750,9 +3750,9 @@ diff -ruN tbamudmaster/src/interpreter.c tbamudmasterad/src/interpreter.c
  
        if (d->olc) {
          free(d->olc);
-diff -ruN tbamudmaster/src/oasis.c tbamudmasterad/src/oasis.c
---- tbamudmaster/src/oasis.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/oasis.c	2026-02-07 13:52:48.476256800 -0600
+diff -ruN src/oasis.c srcad/oasis.c
+--- src/oasis.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/oasis.c	2026-02-07 13:52:48.476256800 -0600
 @@ -205,6 +205,9 @@
      else if (STATE(d) == CON_HEDIT)
        mudlog(CMP, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)),
@@ -3763,9 +3763,9 @@ diff -ruN tbamudmaster/src/oasis.c tbamudmasterad/src/oasis.c
      else
        mudlog(CMP, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)),
          TRUE, "OLC: %s stops editing zone %d allowed zone %d", 
-diff -ruN tbamudmaster/src/oasis.h tbamudmasterad/src/oasis.h
---- tbamudmaster/src/oasis.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/oasis.h	2026-02-06 22:16:31.654999800 -0600
+diff -ruN src/oasis.h srcad/oasis.h
+--- src/oasis.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/oasis.h	2026-02-06 22:16:31.654999800 -0600
 @@ -108,6 +108,7 @@
    int item_type;
    struct trig_proto_list *script; /* for assigning triggers in [r|o|m]edit*/
@@ -3808,9 +3808,9 @@ diff -ruN tbamudmaster/src/oasis.h tbamudmasterad/src/oasis.h
  int  save_config( IDXTYPE nowhere );
  
  /* Prototypes to keep. */
-diff -ruN tbamudmaster/src/players.c tbamudmasterad/src/players.c
---- tbamudmaster/src/players.c	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/players.c	2026-02-07 15:50:32.513433100 -0600
+diff -ruN src/players.c srcad/players.c
+--- src/players.c	2026-02-03 17:55:59.000000000 -0600
++++ srcad/players.c	2026-02-07 15:50:32.513433100 -0600
 @@ -39,6 +39,7 @@
  static void load_skills(FILE *fl, struct char_data *ch);
  static void load_quests(FILE *fl, struct char_data *ch);
@@ -3920,9 +3920,9 @@ diff -ruN tbamudmaster/src/players.c tbamudmasterad/src/players.c
  static void write_aliases_ascii(FILE *file, struct char_data *ch)
  {
    struct alias_data *temp;
-diff -ruN tbamudmaster/src/shop.h tbamudmasterad/src/shop.h
---- tbamudmaster/src/shop.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/shop.h	2026-02-07 00:24:26.672642500 -0600
+diff -ruN src/shop.h srcad/shop.h
+--- src/shop.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/shop.h	2026-02-07 00:24:26.672642500 -0600
 @@ -28,6 +28,11 @@
  #define BUY_TYPE(i)		((i).type)
  #define BUY_WORD(i)		((i).keywords)
@@ -3992,9 +3992,9 @@ diff -ruN tbamudmaster/src/shop.h tbamudmasterad/src/shop.h
 +void save_objbank(void);
 +ACMD(add_objbank);
  #endif /* _SHOP_H_ */
-diff -ruN tbamudmaster/src/structs.h tbamudmasterad/src/structs.h
---- tbamudmaster/src/structs.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/structs.h	2026-02-06 23:55:25.902019600 -0600
+diff -ruN src/structs.h srcad/structs.h
+--- src/structs.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/structs.h	2026-02-06 23:55:25.902019600 -0600
 @@ -87,8 +87,10 @@
  #define ROOM_OLC           14   /**< (R) Modifyable/!compress */
  #define ROOM_BFS_MARK      15   /**< (R) breath-first srch mrk */
@@ -4189,9 +4189,9 @@ diff -ruN tbamudmaster/src/structs.h tbamudmasterad/src/structs.h
    struct obj_data *carrying;    /**< List head for objects in inventory */
    struct descriptor_data *desc; /**< Descriptor/connection info; NPCs = NULL */
  
-diff -ruN tbamudmaster/src/utils.h tbamudmasterad/src/utils.h
---- tbamudmaster/src/utils.h	2026-02-03 17:55:59.000000000 -0600
-+++ tbamudmasterad/src/utils.h	2026-02-06 22:55:10.888735400 -0600
+diff -ruN src/utils.h srcad/utils.h
+--- src/utils.h	2026-02-03 17:55:59.000000000 -0600
++++ srcad/utils.h	2026-02-06 22:55:10.888735400 -0600
 @@ -494,6 +494,10 @@
  /** Sex of ch. */
  #define GET_SEX(ch)	((ch)->player.sex)
