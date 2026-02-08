@@ -18,9 +18,9 @@ ores just use the name, so like a lump of iron ore. lump of coal
 
 any item named anvil or forge will work with smelt and smith
 
-fish are defined as type, so cant be food. I thouoght one could add in cooking to make them into food
+fish are defined as type, so cant be food. I thought one could add in cooking to make them into food
 
-ores, seeds, and fish are added in through oedit. be sue to fill in the 4 values
+ores, seeds, and fish are added in through oedit. be sure to fill in the 4 values
 
 setup some mineshafts, the exits will reset on a sector mineshaft room, so no neeed to make any. once you create some ores they should self populate.
 
