@@ -4,7 +4,7 @@ Added crafting stuff to the original assemblies (c) gdavis. plants, trees, mines
 make a backup before trying to install this. then backup that backup.
 
 if you have modified your mud already, it is probably best to hand patch, otherwise
-drop in the tbaMud-master folder
+drop in the src folder
 type patch < assembliescraft.patch in the shell
 should all be good.
 
