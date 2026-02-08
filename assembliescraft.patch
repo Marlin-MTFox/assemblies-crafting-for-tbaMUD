@@ -758,8 +758,8 @@ diff -ruN tbamudmaster/src/assedit.c tbamudmasterad/src/assedit.c
 +}
 diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 --- tbamudmaster/src/assemblies.c	1969-12-31 18:00:00.000000000 -0600
-+++ tbamudmasterad/src/assemblies.c	2026-02-06 22:59:52.177981100 -0600
-@@ -0,0 +1,2554 @@
++++ tbamudmasterad/src/assemblies.c	2026-02-08 08:13:40.907413000 -0600
+@@ -0,0 +1,2553 @@
 +/* ******************************************************************** *
 + * FILE	: assemblies.c     				Copyright (C) 1999 Geoff Davis	*
 + * USAGE: Implementation for assembly engine.							*
@@ -1155,7 +1155,6 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +bool assemblyAddComponent( obj_vnum lVnum, obj_vnum lComponentVnum, bool bExtract, bool bInRoom, int how_many )
 +{
 +  ASSEMBLY	*pAssembly = NULL;
-+  COMPONENT	*pNewComponents = NULL;
 +
 +  if( (pAssembly = assemblyGetAssemblyPtr( lVnum )) == NULL )
 +  {
@@ -1176,27 +1175,21 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +  }
 +
 +  /* Create a new component table with room for one more entry. */
-+  CREATE( pNewComponents, COMPONENT, pAssembly->lNumComponents + 1 );
-+
-+  if( pAssembly->pComponents != NULL )
-+  {
-+    /* Copy the old table over to the new. */
-+    memmove( pNewComponents, pAssembly->pComponents, pAssembly->lNumComponents * sizeof( COMPONENT ) );
-+    free( pAssembly->pComponents );
-+  }
++  if( pAssembly->pComponents == NULL )
++    CREATE( pAssembly->pComponents, COMPONENT, pAssembly->lNumComponents + 1 );
++  else
++    RECREATE( pAssembly->pComponents, COMPONENT, pAssembly->lNumComponents + 1 );
 +
 +  /*
 +   * Assign the new component table and setup the new component entry. Then
 +   * add increment the number of components.
 +   */
-+  pAssembly->pComponents = pNewComponents;
 +  pAssembly->pComponents[ pAssembly->lNumComponents ].lVnum = lComponentVnum;
 +  pAssembly->pComponents[ pAssembly->lNumComponents ].bExtract = bExtract;
 +  pAssembly->pComponents[ pAssembly->lNumComponents ].bInRoom = bInRoom;
 +  pAssembly->pComponents[ pAssembly->lNumComponents ].chow_many = how_many;
 +  pAssembly->lNumComponents += 1;
 +  
-+//free( pNewComponents );
 +  return (TRUE);
 +}
 +
@@ -3304,16 +3297,21 @@ diff -ruN tbamudmaster/src/assemblies.c tbamudmasterad/src/assemblies.c
 +
 +void free_assemblies(void)
 +{
++ int i;
 +
-+/*while (g_lNumAssemblies) {
-+  if( g_pAssemblyTable[ g_lNumAssemblies ].pComponents != NULL )
-+    free( g_pAssemblyTable[ g_lNumAssemblies ].pComponents );	
-+  g_lNumAssemblies-=1;
-+}*/
-+free( g_pAssemblyTable );
++ if (g_pAssemblyTable == NULL)
++   return;
++
++ for (i = 0; i < g_lNumAssemblies; i++) {
++   if (g_pAssemblyTable[i].pComponents)
++     free(g_pAssemblyTable[i].pComponents);
++
++   g_pAssemblyTable[i].lNumComponents = 0;
++ }
++
++ free(g_pAssemblyTable);
 +}
 +
-
 +#undef __ASSEMBLIES_C__
 \ No newline at end of file
 diff -ruN tbamudmaster/src/comm.c tbamudmasterad/src/comm.c
