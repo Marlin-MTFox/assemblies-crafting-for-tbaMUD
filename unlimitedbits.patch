@@ -1,0 +1,1038 @@
+diff -Naur srco/comm.c srcubf/comm.c
+--- srco/comm.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/comm.c	2026-02-10 17:12:03.121533600 -0600
+@@ -366,6 +366,7 @@
+     free_recent_players();  /* act.informative.c */
+     free_list(world_events); /* free up our global lists */
+     free_list(global_lists);
++	free_list(group_list);	
+   }
+ 
+   if (last_act_message)
+diff -Naur srco/db.c srcubf/db.c
+--- srco/db.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/db.c	2026-02-10 17:05:04.422074600 -0600
+@@ -1299,10 +1299,8 @@
+      * will save the entire world later on, when every room, mobile, and object
+      * is converted. */
+     log("Converting room #%d to 128bits..", virtual_nr);
++	zero_bits_array( world[room_nr].room_flags, RF_ARRAY_MAX);
+     world[room_nr].room_flags[0] = asciiflag_conv(flags);
+-    world[room_nr].room_flags[1] = 0;
+-    world[room_nr].room_flags[2] = 0;
+-    world[room_nr].room_flags[3] = 0;
+ 
+     /* In the old-style files, the 3rd item was the sector-type */
+     world[room_nr].sector_type = atoi(flags2);
+@@ -1318,16 +1316,23 @@
+     }
+ 
+   log("   done.");
++  } else if (retval == 2) {
++  world[room_nr].sector_type = atoi(flags);
++  load_bits_array(world[room_nr].room_flags, RF_ARRAY_MAX, fl);   
+   } else if (retval == 6) {
+     int taeller;
+ 
++	zero_bits_array( world[room_nr].room_flags, RF_ARRAY_MAX);
+     world[room_nr].room_flags[0] = asciiflag_conv(flags);
+-    world[room_nr].room_flags[1] = asciiflag_conv(flags2);
+-    world[room_nr].room_flags[2] = asciiflag_conv(flags3);
+-    world[room_nr].room_flags[3] = asciiflag_conv(flags4);
++		 if(RF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(world[room_nr].room_flags, asciiflag_conv(flags2), 1);
++	     if(RF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(world[room_nr].room_flags, asciiflag_conv(flags3), 2);
++	     if(RF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(world[room_nr].room_flags, asciiflag_conv(flags4), 3);	
+ 
+     sprintf(flags, "room #%d", virtual_nr);	/* sprintf: OK (until 399-bit integers) */
+-    for(taeller=0; taeller < AF_ARRAY_MAX; taeller++)
++    for(taeller=0; taeller < RF_ARRAY_MAX; taeller++)
+       check_bitvector_names(world[room_nr].room_flags[taeller], room_bits_count, flags, "room");
+ 
+     /* Added Sanity check */
+@@ -1742,7 +1747,7 @@
+ void parse_mobile(FILE *mob_f, int nr)
+ {
+   static int i = 0;
+-  int j, t[10], retval;
++  int j, t[10], retval, taeller;
+   char line[READ_SIZE], *tmpptr, letter;
+   char f1[128], f2[128], f3[128], f4[128], f5[128], f6[128], f7[128], f8[128], buf2[128];
+ 
+@@ -1775,26 +1780,49 @@
+ 	"...expecting line of form '# # # {S | E}', but file ended!", nr);
+     exit(1);
+   }
++ 	zero_bits_array(MOB_FLAGS(mob_proto + i), PM_ARRAY_MAX); 
++	zero_bits_array(AFF_FLAGS(mob_proto + i), AF_ARRAY_MAX);
++	
++  if (((retval = sscanf(line, "%s %s %s %s %s %s %s %s %d %c", f1, f2, f3, f4, f5, f6, f7, f8, t + 2, &letter)) == 10)) {
+ 
+-  if (((retval = sscanf(line, "%s %s %s %s %s %s %s %s %d %c", f1, f2, f3, f4, f5, f6, f7, f8, t + 2, &letter)) != 10) && (bitwarning == TRUE)) {
+-    /* Let's make the implementor read some, before converting his world files. */
+-    log("WARNING: Conventional mobile files detected. See config.c.");
+-    exit(1);
+-  } else if ((retval == 4) && (bitwarning == FALSE)) {
+-    log("Converting mobile #%d to 128bits..", nr);
+     MOB_FLAGS(mob_proto + i)[0] = asciiflag_conv(f1);
+-    MOB_FLAGS(mob_proto + i)[1] = 0;
+-    MOB_FLAGS(mob_proto + i)[2] = 0;
+-    MOB_FLAGS(mob_proto + i)[3] = 0;
+-    check_bitvector_names(MOB_FLAGS(mob_proto + i)[0], action_bits_count, buf2, "mobile");
++		 if(PM_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(MOB_FLAGS(mob_proto + i), asciiflag_conv(f2), 1);
++	     if(PM_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(MOB_FLAGS(mob_proto + i), asciiflag_conv(f3), 2);
++	     if(PM_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(MOB_FLAGS(mob_proto + i), asciiflag_conv(f4), 3);	
++	
++    AFF_FLAGS(mob_proto + i)[0] = asciiflag_conv(f5);
++		 if(AF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(AFF_FLAGS(mob_proto + i), asciiflag_conv(f6), 1);
++	     if(AF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(AFF_FLAGS(mob_proto + i), asciiflag_conv(f7), 2);
++	     if(AF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(AFF_FLAGS(mob_proto + i), asciiflag_conv(f8), 3);	
+ 
++    GET_ALIGNMENT(mob_proto + i) = t[2];
++  } else if (retval == 2){
++	GET_ALIGNMENT(mob_proto + i) = atoi(f1); 
++	letter = *f2;
++    load_bits_array(MOB_FLAGS(mob_proto + i), PM_ARRAY_MAX, mob_f);	
++    load_bits_array(AFF_FLAGS(mob_proto + i), AF_ARRAY_MAX, mob_f);
++  } else if ((retval == 4)) {
++    MOB_FLAGS(mob_proto + i)[0] = asciiflag_conv(f1);
+     AFF_FLAGS(mob_proto + i)[0] = asciiflag_conv_aff(f2);
+-    AFF_FLAGS(mob_proto + i)[1] = 0;
+-    AFF_FLAGS(mob_proto + i)[2] = 0;
+-    AFF_FLAGS(mob_proto + i)[3] = 0;
+ 
+     GET_ALIGNMENT(mob_proto + i) = atoi(f3);
++    /* This is necessary, since if we have conventional world files, &letter is
++     * loaded into f4 instead of the letter characters. So what we do, is copy
++     * f4 into letter. Disadvantage is that &letter cannot be longer then 128
++     * characters, but this shouldn't occur anyway. */
++    letter = *f4;
++  } else {
++    log("SYSERR: Format error after string section of mob #%d\n ...expecting line of form '# # # {S | E}'", nr);
++    exit(1);
++  }
+ 
++	
+     /* Make some basic checks. */
+     REMOVE_BIT_AR(AFF_FLAGS(mob_proto + i), AFF_CHARM);
+     REMOVE_BIT_AR(AFF_FLAGS(mob_proto + i), AFF_POISON);
+@@ -1805,45 +1833,12 @@
+       REMOVE_BIT_AR(MOB_FLAGS(mob_proto + i), MOB_AGGR_NEUTRAL);
+     if (MOB_FLAGGED(mob_proto + i, MOB_AGGRESSIVE) && MOB_FLAGGED(mob_proto + i, MOB_AGGR_EVIL))
+       REMOVE_BIT_AR(MOB_FLAGS(mob_proto + i), MOB_AGGR_EVIL);
+-
+-    check_bitvector_names(AFF_FLAGS(mob_proto + i)[0], affected_bits_count, buf2, "mobile affect");
+-
+-    /* This is necessary, since if we have conventional world files, &letter is
+-     * loaded into f4 instead of the letter characters. So what we do, is copy
+-     * f4 into letter. Disadvantage is that &letter cannot be longer then 128
+-     * characters, but this shouldn't occur anyway. */
+-    letter = *f4;
+-
+-    if(bitsavetodisk) {
+-      add_to_save_list(zone_table[real_zone_by_thing(nr)].number, 0);
+-      converting =TRUE;
+-    }
+-
+-  log("   done.");
+-  } else if (retval == 10) {
+-    int taeller;
+-
+-    MOB_FLAGS(mob_proto + i)[0] = asciiflag_conv(f1);
+-    MOB_FLAGS(mob_proto + i)[1] = asciiflag_conv(f2);
+-    MOB_FLAGS(mob_proto + i)[2] = asciiflag_conv(f3);
+-    MOB_FLAGS(mob_proto + i)[3] = asciiflag_conv(f4);
+-    for(taeller=0; taeller < AF_ARRAY_MAX; taeller++)
++  
++    for(taeller=0; taeller < PM_ARRAY_MAX; taeller++)
+       check_bitvector_names(MOB_FLAGS(mob_proto + i)[taeller], action_bits_count, buf2, "mobile");
+-
+-    AFF_FLAGS(mob_proto + i)[0] = asciiflag_conv(f5);
+-    AFF_FLAGS(mob_proto + i)[1] = asciiflag_conv(f6);
+-    AFF_FLAGS(mob_proto + i)[2] = asciiflag_conv(f7);
+-    AFF_FLAGS(mob_proto + i)[3] = asciiflag_conv(f8);
+-
+-    GET_ALIGNMENT(mob_proto + i) = t[2];
+-
+     for(taeller=0; taeller < AF_ARRAY_MAX; taeller++)
+       check_bitvector_names(AFF_FLAGS(mob_proto + i)[taeller], affected_bits_count, buf2, "mobile affect");
+-  } else {
+-    log("SYSERR: Format error after string section of mob #%d\n ...expecting line of form '# # # {S | E}'", nr);
+-    exit(1);
+-  }
+-
++  
+   SET_BIT_AR(MOB_FLAGS(mob_proto + i), MOB_ISNPC);
+   if (MOB_FLAGGED(mob_proto + i, MOB_NOTDEADYET)) {
+     /* Rather bad to load mobiles with this bit already set. */
+@@ -1926,55 +1921,47 @@
+     exit(1);
+   }
+ 
++zero_bits_array(GET_OBJ_EXTRA(obj_proto + i), EF_ARRAY_MAX);
++zero_bits_array(GET_OBJ_WEAR(obj_proto + i), TW_ARRAY_MAX);
++zero_bits_array(GET_OBJ_AFFECT(obj_proto + i), AF_ARRAY_MAX);
+   if (((retval = sscanf(line, " %d %s %s %s %s %s %s %s %s %s %s %s %s", t, f1, f2, f3,
+-      f4, f5, f6, f7, f8, f9, f10, f11, f12)) == 4) && (bitwarning == TRUE)) {
+-    /* Let's make the implementor read some, before converting his world files. */
+-    log("WARNING: Conventional object files detected. Please see config.c.");
+-    exit(1);
+-  } else if (((retval == 4) || (retval == 3)) && (bitwarning == FALSE)) {
+-
+-    if (retval == 3)
+-      t[3] = 0;
+-    else if (retval == 4)
+-      t[3] = asciiflag_conv_aff(f3);
+-
+-    log("Converting object #%d to 128bits..", nr);
++      f4, f5, f6, f7, f8, f9, f10, f11, f12)) == 13)) {
+     GET_OBJ_EXTRA(obj_proto + i)[0] = asciiflag_conv(f1);
+-    GET_OBJ_EXTRA(obj_proto + i)[1] = 0;
+-    GET_OBJ_EXTRA(obj_proto + i)[2] = 0;
+-    GET_OBJ_EXTRA(obj_proto + i)[3] = 0;
+-    GET_OBJ_WEAR(obj_proto + i)[0] = asciiflag_conv(f2);
+-    GET_OBJ_WEAR(obj_proto + i)[1] = 0;
+-    GET_OBJ_WEAR(obj_proto + i)[2] = 0;
+-    GET_OBJ_WEAR(obj_proto + i)[3] = 0;
+-    GET_OBJ_AFFECT(obj_proto + i)[0] = asciiflag_conv_aff(f3);
+-    GET_OBJ_AFFECT(obj_proto + i)[1] = 0;
+-    GET_OBJ_AFFECT(obj_proto + i)[2] = 0;
+-    GET_OBJ_AFFECT(obj_proto + i)[3] = 0;
+-
+-    if(bitsavetodisk) {
+-      add_to_save_list(zone_table[real_zone_by_thing(nr)].number, 1);
+-      converting = TRUE;
+-    }
+-
+-    log("   done.");
+-  } else if (retval == 13) {
+-
+-    GET_OBJ_EXTRA(obj_proto + i)[0] = asciiflag_conv(f1);
+-    GET_OBJ_EXTRA(obj_proto + i)[1] = asciiflag_conv(f2);
+-    GET_OBJ_EXTRA(obj_proto + i)[2] = asciiflag_conv(f3);
+-    GET_OBJ_EXTRA(obj_proto + i)[3] = asciiflag_conv(f4);
++		 if(EF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(obj_proto + i), asciiflag_conv(f2), 1);
++	     if(EF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(obj_proto + i), asciiflag_conv(f3), 2);
++	     if(EF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(obj_proto + i), asciiflag_conv(f4), 3);
++	
+     GET_OBJ_WEAR(obj_proto + i)[0] = asciiflag_conv(f5);
+-    GET_OBJ_WEAR(obj_proto + i)[1] = asciiflag_conv(f6);
+-    GET_OBJ_WEAR(obj_proto + i)[2] = asciiflag_conv(f7);
+-    GET_OBJ_WEAR(obj_proto + i)[3] = asciiflag_conv(f8);
++		 if(TW_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(GET_OBJ_WEAR(obj_proto + i), asciiflag_conv(f6), 1);
++	     if(TW_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(GET_OBJ_WEAR(obj_proto + i), asciiflag_conv(f7), 2);
++	     if(TW_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(GET_OBJ_WEAR(obj_proto + i), asciiflag_conv(f8), 3);	
++	
+     GET_OBJ_AFFECT(obj_proto + i)[0] = asciiflag_conv(f9);
+-    GET_OBJ_AFFECT(obj_proto + i)[1] = asciiflag_conv(f10);
+-    GET_OBJ_AFFECT(obj_proto + i)[2] = asciiflag_conv(f11);
+-    GET_OBJ_AFFECT(obj_proto + i)[3] = asciiflag_conv(f12);
+-
++		 if(AF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array( GET_OBJ_AFFECT(obj_proto + i), asciiflag_conv(f10), 1);
++	     if(AF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array( GET_OBJ_AFFECT(obj_proto + i), asciiflag_conv(f11), 2);
++	     if(AF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array( GET_OBJ_AFFECT(obj_proto + i), asciiflag_conv(f12), 3);
++  } else if (((retval == 4) || (retval == 3))) {
++    GET_OBJ_EXTRA(obj_proto + i)[0] = asciiflag_conv(f1);
++    GET_OBJ_WEAR(obj_proto + i)[0] = asciiflag_conv(f2);
++    if (retval == 4)	
++     GET_OBJ_AFFECT(obj_proto + i)[0] = asciiflag_conv_aff(f3);
++	else
++     GET_OBJ_AFFECT(obj_proto + i)[0] = 0;
++	}else if(retval == 1) {
++ 	  load_bits_array(GET_OBJ_AFFECT(obj_proto + i), AF_ARRAY_MAX, obj_f);	
++	  load_bits_array(GET_OBJ_WEAR(obj_proto + i), TW_ARRAY_MAX, obj_f);
++	  load_bits_array(GET_OBJ_EXTRA(obj_proto + i), EF_ARRAY_MAX, obj_f);
+   } else {
+-    log("SYSERR: Format error in first numeric line (expecting 13 args, got %d), %s", retval, buf2);
++    log("SYSERR: Format error in first numeric line (expecting 1, 3, 4, or 13 args, got %d), %s", retval, buf2);
+     exit(1);
+   }
+ 
+@@ -1985,6 +1972,7 @@
+     log("SYSERR: Expecting second numeric line of %s, but file ended!", buf2);
+     exit(1);
+   }
++
+   if ((retval = sscanf(line, "%d %d %d %d", t, t + 1, t + 2, t + 3)) != 4) {
+     log("SYSERR: Format error in second numeric line (expecting 4 args, got %d), %s", retval, buf2);
+     exit(1);
+@@ -1993,7 +1981,8 @@
+   GET_OBJ_VAL(obj_proto + i, 1) = t[1];
+   GET_OBJ_VAL(obj_proto + i, 2) = t[2];
+   GET_OBJ_VAL(obj_proto + i, 3) = t[3];
+-
++	log("SYSERR: %d %d %d %d", t[0], t[1], t[2], t[3]);
++	
+   if (!get_line(obj_f, line)) {
+     log("SYSERR: Expecting third numeric line of %s, but file ended!", buf2);
+     exit(1);
+@@ -2092,7 +2081,6 @@
+   static zone_rnum zone = 0;
+   int i, cmd_no, num_of_cmds = 0, line_num = 0, tmp, error;
+   char *ptr, buf[READ_SIZE], zname[READ_SIZE], buf2[MAX_STRING_LENGTH];
+-  int zone_fix = FALSE;
+   char t1[80], t2[80];
+   char zbuf1[MAX_STRING_LENGTH], zbuf2[MAX_STRING_LENGTH];
+   char zbuf3[MAX_STRING_LENGTH], zbuf4[MAX_STRING_LENGTH];
+@@ -2144,36 +2132,28 @@
+   line_num += get_line(fl, buf);
+   /* Look for 10 items first (new tbaMUD), if not found, try 4 (old tbaMUD) */
+   if  (sscanf(buf, " %hd %hd %d %d %s %s %s %s %d %d", &Z.bot, &Z.top, &Z.lifespan,
+-      &Z.reset_mode, zbuf1, zbuf2, zbuf3, zbuf4, &Z.min_level, &Z.max_level) != 10)
++      &Z.reset_mode, zbuf1, zbuf2, zbuf3, zbuf4, &Z.min_level, &Z.max_level) == 10)
+   {
+-    if (sscanf(buf, " %hd %hd %d %d ", &Z.bot, &Z.top, &Z.lifespan, &Z.reset_mode) != 4) {
+-      /* This may be due to the fact that the zone has no builder.  So, we just
+-       * attempt to fix this by copying the previous 2 last reads into this
+-       * variable and the last one. */
+-      log("SYSERR: Format error in numeric constant line of %s, attempting to fix.", zname);
+-      if (sscanf(Z.name, " %hd %hd %d %d ", &Z.bot, &Z.top, &Z.lifespan, &Z.reset_mode) != 4) {
+-        log("SYSERR: Could not fix previous error, aborting game.");
+-        exit(1);
+-      } else {
+-        free(Z.name);
+-        Z.name = strdup(Z.builders);
+-        free(Z.builders);
+-        Z.builders = strdup("None.");
+-        zone_fix = TRUE;
+-      }
+-    }
++    Z.zone_flags[0] = asciiflag_conv(zbuf1);
++		 if(ZN_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(Z.zone_flags, asciiflag_conv(zbuf2), 1);
++	     if(ZN_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(Z.zone_flags, asciiflag_conv(zbuf3), 2);
++	     if(ZN_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(Z.zone_flags, asciiflag_conv(zbuf4), 3);	
++  } else if  (sscanf(buf, " %hd %hd %d %d %d %d", &Z.bot, &Z.top, &Z.lifespan,
++      &Z.reset_mode, &Z.min_level, &Z.max_level) == 6) {
++	  load_bits_array(Z.zone_flags, ZN_ARRAY_MAX, fl);
++  } else if (sscanf(buf, " %hd %hd %d %d ", &Z.bot, &Z.top, &Z.lifespan, &Z.reset_mode) == 4) {
+     /* We only found 4 values, so set 'defaults' for the ones not found */
+     Z.min_level = -1;
+     Z.max_level = -1;
+   }
+   else
+   {
+-    /* We found 10 values, so deal with the strings */
+-    Z.zone_flags[0] = asciiflag_conv(zbuf1);
+-    Z.zone_flags[1] = asciiflag_conv(zbuf2);
+-    Z.zone_flags[2] = asciiflag_conv(zbuf3);
+-    Z.zone_flags[3] = asciiflag_conv(zbuf4);
++      log("SYSERR: Format error in numeric constant line of %s, attempting to fix.", zname);
+   }
++  
+   if (Z.bot > Z.top) {
+     log("SYSERR: Zone %d bottom (%d) > top (%d).", Z.number, Z.bot, Z.top);
+     exit(1);
+@@ -2182,14 +2162,11 @@
+   cmd_no = 0;
+ 
+   for (;;) {
+-    /* skip reading one line if we fixed above (line is correct already) */
+-    if (zone_fix != TRUE) {
+       if ((tmp = get_line(fl, buf)) == 0) {
+         log("SYSERR: Format error in %s - premature end of file", zname);
+         exit(1);
+       }
+-    } else
+-      zone_fix = FALSE;
++
+ 
+     line_num += tmp;
+     ptr = buf;
+@@ -3706,11 +3683,12 @@
+ 	GET_OBJ_VNUM(obj), obj->short_description, GET_OBJ_RENT(obj));
+ 
+   snprintf(objname, sizeof(objname), "Object #%d (%s)", GET_OBJ_VNUM(obj), obj->short_description);
+-  for(y = 0; y < TW_ARRAY_MAX; y++) {
++  for(y = 0; y < TW_ARRAY_MAX; y++)
+     error |= check_bitvector_names(GET_OBJ_WEAR(obj)[y], wear_bits_count, objname, "object wear");
++  for(y = 0; y < EF_ARRAY_MAX; y++)
+     error |= check_bitvector_names(GET_OBJ_EXTRA(obj)[y], extra_bits_count, objname, "object extra");
++  for(y = 0; y < AF_ARRAY_MAX; y++)
+     error |= check_bitvector_names(GET_OBJ_AFFECT(obj)[y], affected_bits_count, objname, "object affect");
+-  }
+ 
+   switch (GET_OBJ_TYPE(obj)) {
+   case ITEM_DRINKCON:
+@@ -4172,3 +4150,62 @@
+ 
+   fclose(fl);
+ }
++
++/** reading and writing of bits without recoding all the reads and writes with each new array set MTFox*/
++void zero_bits_array(int bitvector[], int array_size)
++{
++	int j;
++	
++	for (j = 0;j < array_size; j++)
++     bitvector[j] = 0;
++         
++}
++
++void copy_flags_to_bit_array(int bitvector[], int list, sh_int loc)
++{
++sh_int bit;
++    for(bit = 0; bit < 32; bit++) { 
++if (IS_SET(list, (1 << bit)))
++  SET_BIT(bitvector[loc], bit);
++ }
++}
++
++static int count_bits(int bitvector[], int array_size)
++{
++	int b, m, count = 0;
++	for (b = 0;b < array_size; b++) {
++	   for (m = 0; m < 32;m++){
++	if(IS_SET(bitvector[b], (1 << m)))
++		count++;
++	   }
++	}
++	   return(count);
++}
++
++void load_bits_array(int bitvector[], int array_size, FILE *fp) {
++    int masks, bits, set, j;
++   
++    masks = fread_number(fp);
++
++	if(masks > array_size) {
++		log ("Trying to read more arrays then allocated. load_bits_array\r\n");
++		masks = 1;
++	}
++    bits = fread_number(fp); //probably won't ever use it, but was used in runters bitmask system
++	for (j = 0;j < masks; j++) {
++		set = fread_number(fp);
++		bitvector[set] = fread_number(fp);
++	}
++}
++
++void save_bits_array(int bitvector[], int array_size, FILE *fp) {
++	
++int i, j = count_bits(bitvector, array_size);
++
++    fprintf(fp, "%d %d", array_size, j);
++
++    for(i= 0;i < array_size; i++)
++        fprintf(fp, " %d %d", i, bitvector[i]);
++
++    fprintf(fp, "\n");
++}
+\ No newline at end of file
+diff -Naur srco/db.h srcubf/db.h
+--- srco/db.h	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/db.h	2026-02-10 13:48:08.041496700 -0600
+@@ -399,6 +399,12 @@
+ /* Happyhour global */
+ extern struct happyhour happy_data;
+ 
++/* new read and write */
++void load_bits_array(int bitvector[], int array_size, FILE *fp);
++void save_bits_array(int bitvector[], int array_size, FILE *fp);
++void zero_bits_array(int bitvector[], int array_size);
++void copy_flags_to_bit_array(int bitvector[], int list, sh_int loc);
++
+ /* begin previously located in players.c, returned to db.c */
+ extern struct player_index_element *player_table;
+ extern int top_of_p_table;
+diff -Naur srco/genmob.c srcubf/genmob.c
+--- srco/genmob.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/genmob.c	2026-02-10 11:11:37.275700000 -0600
+@@ -383,13 +383,14 @@
+   if(n < MAX_STRING_LENGTH) {
+     fprintf(fd, "%s", convert_from_tabs(buf));
+   
+-    fprintf(fd, "%d %d %d %d %d %d %d %d %d E\n"
+-        "%d %d %d %dd%d+%d %dd%d+%d\n",
+-        MOB_FLAGS(mob)[0], MOB_FLAGS(mob)[1],
+-        MOB_FLAGS(mob)[2], MOB_FLAGS(mob)[3],
+-        AFF_FLAGS(mob)[0], AFF_FLAGS(mob)[1],
+-        AFF_FLAGS(mob)[2], AFF_FLAGS(mob)[3],
+-        GET_ALIGNMENT(mob),
++  fprintf(fd,	"%d E\n",
++		GET_ALIGNMENT(mob)
++  );
++save_bits_array(MOB_FLAGS(mob), PM_ARRAY_MAX, fd);
++save_bits_array(AFF_FLAGS(mob), AF_ARRAY_MAX, fd);
++
++
++  fprintf(fd,	"%d %d %d %dd%d+%d %dd%d+%d\n",
+         GET_LEVEL(mob), 20 - GET_HITROLL(mob), GET_AC(mob) / 10, GET_HIT(mob),
+         GET_MANA(mob), GET_MOVE(mob), GET_NDD(mob), GET_SDD(mob),
+         GET_DAMROLL(mob));
+diff -Naur srco/genobj.c srcubf/genobj.c
+--- srco/genobj.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/genobj.c	2026-02-10 11:03:42.432277700 -0600
+@@ -179,9 +179,6 @@
+ int save_objects(zone_rnum zone_num)
+ {
+   char filename[128], buf[MAX_STRING_LENGTH], buf2[MAX_STRING_LENGTH];
+-  char ebuf1[MAX_STRING_LENGTH], ebuf2[MAX_STRING_LENGTH], ebuf3[MAX_STRING_LENGTH], ebuf4[MAX_STRING_LENGTH];
+-  char wbuf1[MAX_STRING_LENGTH], wbuf2[MAX_STRING_LENGTH], wbuf3[MAX_STRING_LENGTH], wbuf4[MAX_STRING_LENGTH];
+-  char pbuf1[MAX_STRING_LENGTH], pbuf2[MAX_STRING_LENGTH], pbuf3[MAX_STRING_LENGTH], pbuf4[MAX_STRING_LENGTH];
+   int counter, counter2, realcounter;
+   FILE *fp;
+   struct obj_data *obj;
+@@ -232,31 +229,17 @@
+       
+       fprintf(fp, "%s", convert_from_tabs(buf2));
+ 
+-      sprintascii(ebuf1, GET_OBJ_EXTRA(obj)[0]);
+-      sprintascii(ebuf2, GET_OBJ_EXTRA(obj)[1]);
+-      sprintascii(ebuf3, GET_OBJ_EXTRA(obj)[2]);
+-      sprintascii(ebuf4, GET_OBJ_EXTRA(obj)[3]);
+-      sprintascii(wbuf1, GET_OBJ_WEAR(obj)[0]);
+-      sprintascii(wbuf2, GET_OBJ_WEAR(obj)[1]);
+-      sprintascii(wbuf3, GET_OBJ_WEAR(obj)[2]);
+-      sprintascii(wbuf4, GET_OBJ_WEAR(obj)[3]);
+-      sprintascii(pbuf1, GET_OBJ_AFFECT(obj)[0]);
+-      sprintascii(pbuf2, GET_OBJ_AFFECT(obj)[1]);
+-      sprintascii(pbuf3, GET_OBJ_AFFECT(obj)[2]);
+-      sprintascii(pbuf4, GET_OBJ_AFFECT(obj)[3]);
+-
+-      fprintf(fp, "%d %s %s %s %s %s %s %s %s %s %s %s %s\n"
+-          "%d %d %d %d\n"
+-          "%d %d %d %d %d\n",
+-
+-	  GET_OBJ_TYPE(obj),
+-          ebuf1, ebuf2, ebuf3, ebuf4,
+-          wbuf1, wbuf2, wbuf3, wbuf4,
+-          pbuf1, pbuf2, pbuf3, pbuf4,
+-          GET_OBJ_VAL(obj, 0), GET_OBJ_VAL(obj, 1),
+-          GET_OBJ_VAL(obj, 2), GET_OBJ_VAL(obj, 3),
+-          GET_OBJ_WEIGHT(obj), GET_OBJ_COST(obj),
+-          GET_OBJ_RENT(obj), GET_OBJ_LEVEL(obj), GET_OBJ_TIMER(obj)
++      fprintf(fp, "%d\n", GET_OBJ_TYPE(obj));
++save_bits_array(GET_OBJ_AFFECT(obj), AF_ARRAY_MAX, fp);
++save_bits_array(GET_OBJ_WEAR(obj), TW_ARRAY_MAX, fp);
++save_bits_array(GET_OBJ_EXTRA(obj), EF_ARRAY_MAX, fp);
++
++      fprintf(fp,
++	      "%d %d %d %d\n"
++	      "%d %d %d %d %d\n",
++
++	      GET_OBJ_VAL(obj, 0), GET_OBJ_VAL(obj, 1), GET_OBJ_VAL(obj, 2), GET_OBJ_VAL(obj, 3),
++	      GET_OBJ_WEIGHT(obj), GET_OBJ_COST(obj), GET_OBJ_RENT(obj), GET_OBJ_LEVEL(obj), GET_OBJ_TIMER(obj)
+       );
+ 
+       /* Do we have script(s) attached? */
+diff -Naur srco/genolc.c srcubf/genolc.c
+--- srco/genolc.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/genolc.c	2026-02-10 10:50:38.528490600 -0600
+@@ -612,16 +612,11 @@
+ 	ddesc, STRING_TERMINATOR
+   );
+ 
+-  fprintf(fd, "%d %d %d %d %d %d %d %d %d E\n"
+-      "%d %d %d %dd%d+%d %dd%d+%d\n",
+-      MOB_FLAGS(mob)[0], MOB_FLAGS(mob)[1],
+-      MOB_FLAGS(mob)[2], MOB_FLAGS(mob)[3],
+-      AFF_FLAGS(mob)[0], AFF_FLAGS(mob)[1],
+-      AFF_FLAGS(mob)[2], AFF_FLAGS(mob)[3],
+-      GET_ALIGNMENT(mob),
+-      GET_LEVEL(mob), 20 - GET_HITROLL(mob), GET_AC(mob) / 10, GET_HIT(mob),
+-      GET_MANA(mob), GET_MOVE(mob), GET_NDD(mob), GET_SDD(mob),
+-      GET_DAMROLL(mob));
++  fprintf(fd,	"%d E\n",
++		GET_ALIGNMENT(mob)
++  );
++save_bits_array(MOB_FLAGS(mob), PM_ARRAY_MAX, fd);
++save_bits_array(AFF_FLAGS(mob), AF_ARRAY_MAX, fd);
+ 
+   fprintf(fd, 	"%d %d\n"
+ 		"%d %d %d\n",
+@@ -767,9 +762,6 @@
+ static int export_save_objects(zone_rnum zrnum)
+ {
+   char buf[MAX_STRING_LENGTH];
+-  char ebuf1[MAX_STRING_LENGTH], ebuf2[MAX_STRING_LENGTH], ebuf3[MAX_STRING_LENGTH], ebuf4[MAX_STRING_LENGTH];
+-  char wbuf1[MAX_STRING_LENGTH], wbuf2[MAX_STRING_LENGTH], wbuf3[MAX_STRING_LENGTH], wbuf4[MAX_STRING_LENGTH];
+-  char pbuf1[MAX_STRING_LENGTH], pbuf2[MAX_STRING_LENGTH], pbuf3[MAX_STRING_LENGTH], pbuf4[MAX_STRING_LENGTH];
+   obj_rnum ornum;
+   obj_vnum ovnum;
+   int i;
+@@ -803,25 +795,10 @@
+ 	      (obj->description && *obj->description) ?	obj->description : "undefined",
+ 	      buf);
+ 
+-      sprintascii(ebuf1, GET_OBJ_EXTRA(obj)[0]);
+-      sprintascii(ebuf2, GET_OBJ_EXTRA(obj)[1]);
+-      sprintascii(ebuf3, GET_OBJ_EXTRA(obj)[2]);
+-      sprintascii(ebuf4, GET_OBJ_EXTRA(obj)[3]);
+-      sprintascii(wbuf1, GET_OBJ_WEAR(obj)[0]);
+-      sprintascii(wbuf2, GET_OBJ_WEAR(obj)[1]);
+-      sprintascii(wbuf3, GET_OBJ_WEAR(obj)[2]);
+-      sprintascii(wbuf4, GET_OBJ_WEAR(obj)[3]);
+-      sprintascii(pbuf1, GET_OBJ_AFFECT(obj)[0]);
+-      sprintascii(pbuf2, GET_OBJ_AFFECT(obj)[1]);
+-      sprintascii(pbuf3, GET_OBJ_AFFECT(obj)[2]);
+-      sprintascii(pbuf4, GET_OBJ_AFFECT(obj)[3]);
+-
+-      fprintf(obj_file,
+-          "%d %s %s %s %s %s %s %s %s %s %s %s %s\n",
+-          GET_OBJ_TYPE(obj),
+-          ebuf1, ebuf2, ebuf3, ebuf4,
+-          wbuf1, wbuf2, wbuf3, wbuf4,
+-          pbuf1, pbuf2, pbuf3, pbuf4);
++fprintf(obj_file, "%d\n", GET_OBJ_TYPE(obj));
++save_bits_array(GET_OBJ_AFFECT(obj), AF_ARRAY_MAX, obj_file);
++save_bits_array(GET_OBJ_WEAR(obj), TW_ARRAY_MAX, obj_file);
++save_bits_array(GET_OBJ_EXTRA(obj), EF_ARRAY_MAX, obj_file);
+ 
+       if (GET_OBJ_TYPE(obj) != ITEM_CONTAINER)
+         fprintf(obj_file,
+@@ -904,14 +881,14 @@
+       fprintf(room_file, 	"#QQ%02d\n"
+ 			"%s%c\n"
+ 			"%s%c\n"
+-			"QQ %d %d %d %d %d\n",
++			"QQ %d\n",
+ 		room->number%100,
+ 		room->name ? room->name : "Untitled", STRING_TERMINATOR,
+ 		buf, STRING_TERMINATOR,
+-		room->room_flags[0], room->room_flags[1],
+-                room->room_flags[2], room->room_flags[3], room->sector_type
++        room->sector_type
+       );
+-
++      save_bits_array(room->room_flags, RF_ARRAY_MAX, room_file);
++	  
+       /* Now you write out the exits for the room. */
+       for (j = 0; j < DIR_COUNT; j++) {
+ 	if (R_EXIT(room, j)) {
+diff -Naur srco/genwld.c srcubf/genwld.c
+--- srco/genwld.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/genwld.c	2026-02-10 16:38:25.704307000 -0600
+@@ -305,14 +305,13 @@
+       int n = snprintf(buf2, MAX_STRING_LENGTH, "#%d\n"
+ 			"%s%c\n"
+ 			"%s%c\n"
+-			"%d %d %d %d %d %d\n",
++			"%d %d\n",
+ 	room->number,
+ 	room->name ? room->name : "Untitled", STRING_TERMINATOR,
+ 	buf, STRING_TERMINATOR,
+-	zone_table[room->zone].number, room->room_flags[0], room->room_flags[1], room->room_flags[2], 
+-	  room->room_flags[3], room->sector_type 
++	zone_table[room->zone].number, room->sector_type 
+       );
+-      
++		
+       if(n >= MAX_STRING_LENGTH) {
+         mudlog(BRF,LVL_BUILDER,TRUE,
+                "SYSERR: Could not save room #%d due to size (%d > maximum of %d).",
+@@ -321,7 +320,7 @@
+       }
+ 
+   fprintf(sf, "%s", convert_from_tabs(buf2));
+- 
++  save_bits_array(room->room_flags, RF_ARRAY_MAX, sf);
+       /* Now you write out the exits for the room. */
+       for (j = 0; j < DIR_COUNT; j++) {
+ 	if (R_EXIT(room, j)) {
+diff -Naur srco/genzon.c srcubf/genzon.c
+--- srco/genzon.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/genzon.c	2026-02-10 10:21:30.867001700 -0600
+@@ -330,8 +330,6 @@
+   char fname[128], oldname[128];
+   const char *comment = NULL;
+   FILE *zfile;
+-  char zbuf1[MAX_STRING_LENGTH], zbuf2[MAX_STRING_LENGTH];
+-  char zbuf3[MAX_STRING_LENGTH], zbuf4[MAX_STRING_LENGTH];
+ 
+ #if CIRCLE_UNSIGNED_INDEX
+   if (zone_num == NOWHERE || zone_num > top_of_zone_table) {
+@@ -370,16 +368,11 @@
+           zone_table[zone_num].reset_mode
+           );
+   } else {
+-    sprintascii(zbuf1, zone_table[zone_num].zone_flags[0]);
+-    sprintascii(zbuf2, zone_table[zone_num].zone_flags[1]);
+-    sprintascii(zbuf3, zone_table[zone_num].zone_flags[2]);
+-    sprintascii(zbuf4, zone_table[zone_num].zone_flags[3]);
+-
+     /* Print zone header to file. */
+     fprintf(zfile, "#%d\n"
+                    "%s~\n"
+                    "%s~\n"
+-                   "%d %d %d %d %s %s %s %s %d %d\n",       /* New tbaMUD data line */
++                   "%d %d %d %d %d %d\n",       /* New tbaMUD data line */
+            zone_table[zone_num].number,
+           (zone_table[zone_num].builders && *zone_table[zone_num].builders)
+                 ? zone_table[zone_num].builders : "None.",
+@@ -389,10 +382,10 @@
+           zone_table[zone_num].top,
+           zone_table[zone_num].lifespan,
+           zone_table[zone_num].reset_mode,
+-          zbuf1, zbuf2, zbuf3, zbuf4,
+           zone_table[zone_num].min_level,
+           zone_table[zone_num].max_level
+           );
++	  save_bits_array(zone_table[zone_num].zone_flags, ZN_ARRAY_MAX, zfile);		  
+   }
+ 
+ 	/* Handy Quick Reference Chart for Zone Values.
+diff -Naur srco/magic.c srcubf/magic.c
+--- srco/magic.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/magic.c	2026-02-10 10:08:05.743531800 -0600
+@@ -304,7 +304,7 @@
+ 		      int spellnum, int savetype)
+ {
+   struct affected_type af[MAX_SPELL_AFFECTS];
+-  bool accum_affect = FALSE, accum_duration = FALSE;
++  bool accum_affect = FALSE, accum_duration = FALSE, found = FALSE;
+   const char *to_vict = NULL, *to_room = NULL;
+   int i, j;
+ 
+@@ -538,11 +538,15 @@
+     return;
+   }
+ 
+-  for (i = 0; i < MAX_SPELL_AFFECTS; i++)
+-    if (af[i].bitvector[0] || af[i].bitvector[1] ||
+-        af[i].bitvector[2] || af[i].bitvector[3] ||
+-        (af[i].location != APPLY_NONE))
++  for (i = 0; i < MAX_SPELL_AFFECTS; i++){
++	  found = FALSE;
++	  for (j = 0; j < AF_ARRAY_MAX; j++)
++         if ((af[i].bitvector[j]))
++		   found = TRUE;
++  
++    if (af[i].location != APPLY_NONE || found == TRUE)	  
+       affect_join(victim, af+i, accum_duration, FALSE, accum_affect, FALSE);
++}
+ 
+   if (to_vict != NULL)
+     act(to_vict, FALSE, victim, 0, ch, TO_CHAR);
+diff -Naur srco/objsave.c srcubf/objsave.c
+--- srco/objsave.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/objsave.c	2026-02-10 09:43:03.139115000 -0600
+@@ -86,13 +86,14 @@
+              GET_OBJ_VAL(obj, 2),
+              GET_OBJ_VAL(obj, 3)
+              );
+-  if (GET_OBJ_EXTRA(obj) != GET_OBJ_EXTRA(temp))
+-    fprintf(fp, "Flag: %d %d %d %d\n", GET_OBJ_EXTRA(obj)[0], GET_OBJ_EXTRA(obj)[1], GET_OBJ_EXTRA(obj)[2], GET_OBJ_EXTRA(obj)[3]);
+-
+ #define TEST_OBJS(obj1, obj2, field) ((!obj1->field || !obj2->field || \
+                                       strcmp(obj1->field, obj2->field)))
+ #define TEST_OBJN(field) (obj->obj_flags.field != temp->obj_flags.field)
+ 
++  if (TEST_OBJN(extra_flags)) {
++    fprintf(fp, "Extr:\n");
++    save_bits_array(GET_OBJ_EXTRA(obj), EF_ARRAY_MAX, fp);
++  }
+   if (TEST_OBJS(obj, temp, name))
+     fprintf(fp, "Name: %s\n", obj->name ? obj->name : "Undefined");
+   if (TEST_OBJS(obj, temp, short_description))
+@@ -115,10 +116,14 @@
+     fprintf(fp, "Cost: %d\n", GET_OBJ_COST(obj));
+   if (TEST_OBJN(cost_per_day))
+     fprintf(fp, "Rent: %d\n", GET_OBJ_RENT(obj));
+-  if (TEST_OBJN(bitvector))
+-    fprintf(fp, "Perm: %d %d %d %d\n", GET_OBJ_AFFECT(obj)[0], GET_OBJ_AFFECT(obj)[1], GET_OBJ_AFFECT(obj)[2], GET_OBJ_AFFECT(obj)[3]);
+-  if (TEST_OBJN(wear_flags))
+-    fprintf(fp, "Wear: %d %d %d %d\n", GET_OBJ_WEAR(obj)[0], GET_OBJ_WEAR(obj)[1], GET_OBJ_WEAR(obj)[2], GET_OBJ_WEAR(obj)[3]);
++  if (TEST_OBJN(bitvector)) {
++    fprintf(fp, "Perm:\n");
++	  save_bits_array(GET_OBJ_AFFECT(obj), AF_ARRAY_MAX, fp);
++  }
++  if (TEST_OBJN(wear_flags)) {
++    fprintf(fp, "Wear:\n");
++	save_bits_array(GET_OBJ_WEAR(obj), TW_ARRAY_MAX, fp);
++  }
+ 
+   /* Do we have affects? */
+   for (counter2 = 0; counter2 < MAX_OBJ_AFFECT; counter2++)
+@@ -1110,14 +1115,19 @@
+         new_desc->next = temp->ex_description;
+         temp->ex_description = new_desc;
+       }
++	  else if (!strcmp(tag, "Extr"))
++         load_bits_array(GET_OBJ_EXTRA(temp), EF_ARRAY_MAX, fl);	  
+       break;
+     case 'F':
+       if (!strcmp(tag, "Flag")) {
+         sscanf(line, "%s %s %s %s", f1, f2, f3, f4);
+         GET_OBJ_EXTRA(temp)[0] = asciiflag_conv(f1);
+-        GET_OBJ_EXTRA(temp)[1] = asciiflag_conv(f2);
+-        GET_OBJ_EXTRA(temp)[2] = asciiflag_conv(f3);
+-        GET_OBJ_EXTRA(temp)[3] = asciiflag_conv(f4);
++		if (EF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(temp), asciiflag_conv(f2), 1);
++	     if(EF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(temp), asciiflag_conv(f3), 2);
++	     if(EF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(GET_OBJ_EXTRA(temp), asciiflag_conv(f4), 3);
+       }
+       break;
+     case 'L':
+@@ -1130,12 +1140,19 @@
+       break;
+     case 'P':
+       if (!strcmp(tag, "Perm")) {
++      if(sscanf(line, "%s", f1)!=1) {
++        load_bits_array(GET_OBJ_AFFECT(temp), AF_ARRAY_MAX, fl);
++     } else {
+         sscanf(line, "%s %s %s %s", f1, f2, f3, f4);
+         GET_OBJ_AFFECT(temp)[0] = asciiflag_conv(f1);
+-        GET_OBJ_AFFECT(temp)[1] = asciiflag_conv(f2);
+-        GET_OBJ_AFFECT(temp)[2] = asciiflag_conv(f3);
+-        GET_OBJ_AFFECT(temp)[3] = asciiflag_conv(f4);
++		if(AF_ARRAY_MAX > 1)
++         copy_flags_to_bit_array(GET_OBJ_AFFECT(temp), asciiflag_conv(f2), 1);
++	    if(AF_ARRAY_MAX > 2)
++         copy_flags_to_bit_array(GET_OBJ_AFFECT(temp), asciiflag_conv(f3), 2);
++	    if(AF_ARRAY_MAX > 3)
++         copy_flags_to_bit_array(GET_OBJ_AFFECT(temp), asciiflag_conv(f4), 3);		
+       }
++	  }
+       break;
+     case 'R':
+       if (!strcmp(tag, "Rent"))
+@@ -1151,12 +1168,19 @@
+       break;
+     case 'W':
+       if (!strcmp(tag, "Wear")) {
++      if(sscanf(line, "%s", f1)!=1) {
++          load_bits_array(GET_OBJ_WEAR(temp), TW_ARRAY_MAX, fl);
++      } else {		  
+         sscanf(line, "%s %s %s %s", f1, f2, f3, f4);
+         GET_OBJ_WEAR(temp)[0] = asciiflag_conv(f1);
+-        GET_OBJ_WEAR(temp)[1] = asciiflag_conv(f2);
+-        GET_OBJ_WEAR(temp)[2] = asciiflag_conv(f3);
+-        GET_OBJ_WEAR(temp)[3] = asciiflag_conv(f4);
++		if(TW_ARRAY_MAX > 1)
++         copy_flags_to_bit_array(GET_OBJ_WEAR(temp), asciiflag_conv(f2), 1);
++	    if(TW_ARRAY_MAX > 2)
++         copy_flags_to_bit_array(GET_OBJ_WEAR(temp), asciiflag_conv(f3), 2);
++	    if(TW_ARRAY_MAX > 3)
++         copy_flags_to_bit_array(GET_OBJ_WEAR(temp), asciiflag_conv(f4), 3);		
+       }
++	  }
+       else if (!strcmp(tag, "Wght"))
+         GET_OBJ_WEIGHT(temp) = num;
+       break;
+diff -Naur srco/players.c srcubf/players.c
+--- srco/players.c	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/players.c	2026-02-10 08:59:29.471943600 -0600
+@@ -36,6 +36,7 @@
+ 
+ /* local functions */
+ static void load_affects(FILE *fl, struct char_data *ch);
++static void load_bit_affects(FILE *fl, struct char_data *ch);
+ static void load_skills(FILE *fl, struct char_data *ch);
+ static void load_quests(FILE *fl, struct char_data *ch);
+ static void load_HMVS(struct char_data *ch, const char *line, int mode);
+@@ -314,21 +315,30 @@
+ 	else if (!strcmp(tag, "Act ")) {
+          if (sscanf(line, "%s %s %s %s", f1, f2, f3, f4) == 4) {
+           PLR_FLAGS(ch)[0] = asciiflag_conv(f1);
+-          PLR_FLAGS(ch)[1] = asciiflag_conv(f2);
+-          PLR_FLAGS(ch)[2] = asciiflag_conv(f3);
+-          PLR_FLAGS(ch)[3] = asciiflag_conv(f4);
++		 if(PM_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(PLR_FLAGS(ch), asciiflag_conv(f2), 1);
++	     if(PM_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(PLR_FLAGS(ch), asciiflag_conv(f3), 2);
++	     if(PM_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(PLR_FLAGS(ch), asciiflag_conv(f4), 3);
+         } else
+           PLR_FLAGS(ch)[0] = asciiflag_conv(line);
+       } else if (!strcmp(tag, "Aff ")) {
+         if (sscanf(line, "%s %s %s %s", f1, f2, f3, f4) == 4) {
+           AFF_FLAGS(ch)[0] = asciiflag_conv(f1);
+-          AFF_FLAGS(ch)[1] = asciiflag_conv(f2);
+-          AFF_FLAGS(ch)[2] = asciiflag_conv(f3);
+-          AFF_FLAGS(ch)[3] = asciiflag_conv(f4);
++		 if(AF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(AFF_FLAGS(ch), asciiflag_conv(f2), 1);
++	     if(AF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(AFF_FLAGS(ch), asciiflag_conv(f3), 2);
++	     if(AF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(AFF_FLAGS(ch), asciiflag_conv(f4), 3);
+         } else
+           AFF_FLAGS(ch)[0] = asciiflag_conv(line);
+ 	}
+-	if (!strcmp(tag, "Affs")) 	load_affects(fl, ch);
++	else if (!strcmp(tag, "Acta"))  load_bits_array(PLR_FLAGS(ch), PR_ARRAY_MAX, fl);
++	else if (!strcmp(tag, "Affs")) 	load_affects(fl, ch);
++	else if (!strcmp(tag, "Affa")) 	load_bits_array(AFF_FLAGS(ch), AF_ARRAY_MAX, fl);		
++	else if (!strcmp(tag, "Affe")) 	load_bit_affects(fl, ch);	
+         else if (!strcmp(tag, "Alin"))	GET_ALIGNMENT(ch)	= atoi(line);
+ 	else if (!strcmp(tag, "Alis"))	read_aliases_ascii(fl, ch, atoi(line));
+ 	break;
+@@ -409,12 +419,16 @@
+ 	else if (!strcmp(tag, "Plyd"))	ch->player.time.played	= atoi(line);
+ 	else if (!strcmp(tag, "PfIn"))	POOFIN(ch)		= strdup(line);
+ 	else if (!strcmp(tag, "PfOt"))	POOFOUT(ch)		= strdup(line);
++	else if (!strcmp(tag, "Prfa"))	load_bits_array(PRF_FLAGS(ch), PR_ARRAY_MAX, fl);	
+         else if (!strcmp(tag, "Pref")) {
+           if (sscanf(line, "%s %s %s %s", f1, f2, f3, f4) == 4) {
+             PRF_FLAGS(ch)[0] = asciiflag_conv(f1);
+-            PRF_FLAGS(ch)[1] = asciiflag_conv(f2);
+-            PRF_FLAGS(ch)[2] = asciiflag_conv(f3);
+-            PRF_FLAGS(ch)[3] = asciiflag_conv(f4);
++		 if(PR_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(PRF_FLAGS(ch), asciiflag_conv(f2), 1);
++	     if(PR_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(PRF_FLAGS(ch), asciiflag_conv(f3), 2);
++	     if(PR_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(PRF_FLAGS(ch), asciiflag_conv(f4), 3);			
+           } else
+ 	    PRF_FLAGS(ch)[0] = asciiflag_conv(f1);
+ 	  }
+@@ -492,7 +506,7 @@
+ void save_char(struct char_data * ch)
+ {
+   FILE *fl;
+-  char filename[40], buf[MAX_STRING_LENGTH], bits[127], bits2[127], bits3[127], bits4[127];
++  char filename[40], buf[MAX_STRING_LENGTH];
+   int i, j, id, save_index = FALSE;
+   struct affected_type *aff, tmp_aff[MAX_AFFECT];
+   struct obj_data *char_eq[NUM_WEARS];
+@@ -593,23 +607,12 @@
+   if (GET_ALIGNMENT(ch)  != PFDEF_ALIGNMENT)	fprintf(fl, "Alin: %d\n", GET_ALIGNMENT(ch));
+ 
+ 
+-  sprintascii(bits,  PLR_FLAGS(ch)[0]);
+-  sprintascii(bits2, PLR_FLAGS(ch)[1]);
+-  sprintascii(bits3, PLR_FLAGS(ch)[2]);
+-  sprintascii(bits4, PLR_FLAGS(ch)[3]);
+-  fprintf(fl, "Act : %s %s %s %s\n", bits, bits2, bits3, bits4);
+-
+-  sprintascii(bits,  AFF_FLAGS(ch)[0]);
+-  sprintascii(bits2, AFF_FLAGS(ch)[1]);
+-  sprintascii(bits3, AFF_FLAGS(ch)[2]);
+-  sprintascii(bits4, AFF_FLAGS(ch)[3]);
+-  fprintf(fl, "Aff : %s %s %s %s\n", bits, bits2, bits3, bits4);
+-
+-  sprintascii(bits,  PRF_FLAGS(ch)[0]);
+-  sprintascii(bits2, PRF_FLAGS(ch)[1]);
+-  sprintascii(bits3, PRF_FLAGS(ch)[2]);
+-  sprintascii(bits4, PRF_FLAGS(ch)[3]);
+-  fprintf(fl, "Pref: %s %s %s %s\n", bits, bits2, bits3, bits4);
++  fprintf(fl, "Acta:\n");
++    save_bits_array(PLR_FLAGS(ch), PM_ARRAY_MAX, fl);
++  fprintf(fl, "Affa:\n");
++    save_bits_array(AFF_FLAGS(ch), AF_ARRAY_MAX, fl); 
++  fprintf(fl, "Prfa:\n");
++    save_bits_array(PRF_FLAGS(ch), PR_ARRAY_MAX, fl);
+ 
+  if (GET_SAVE(ch, 0)	   != PFDEF_SAVETHROW)	fprintf(fl, "Thr1: %d\n", GET_SAVE(ch, 0));
+   if (GET_SAVE(ch, 1)	   != PFDEF_SAVETHROW)	fprintf(fl, "Thr2: %d\n", GET_SAVE(ch, 1));
+@@ -678,14 +681,16 @@
+ 
+   /* Save affects */
+   if (tmp_aff[0].spell > 0) {
+-    fprintf(fl, "Affs:\n");
+     for (i = 0; i < MAX_AFFECT; i++) {
+-      aff = &tmp_aff[i];
+-      if (aff->spell)
+-		fprintf(fl, "%d %d %d %d %d %d %d %d\n", aff->spell, aff->duration,
+-          aff->modifier, aff->location, aff->bitvector[0], aff->bitvector[1], aff->bitvector[2], aff->bitvector[3]);
++        aff = &tmp_aff[i];		
++      if (aff->spell) {		
++		fprintf(fl, "Affe: \n%d %d %d %d %d ", aff->spell, aff->duration,
++          aff->modifier, aff->location, AF_ARRAY_MAX);
++		for(j = 0; j < AF_ARRAY_MAX; j++)  
++		  fprintf(fl, "%d ", aff->bitvector[j]);
++	  fprintf(fl, "\n");
+     }
+-    fprintf(fl, "0 0 0 0 0 0 0 0\n");
++   }
+   }
+ 
+   write_aliases_ascii(fl, ch);
+@@ -843,9 +848,12 @@
+       af.location = num4;
+       if (n_vars == 8) {              /* New 128-bit version */
+           af.bitvector[0] =  num5;
+-          af.bitvector[1] =  num6;
+-          af.bitvector[2] =  num7;
+-          af.bitvector[3] =  num8;
++		 if(AF_ARRAY_MAX > 1)
++          copy_flags_to_bit_array(af.bitvector, num6, 1);
++	     if(AF_ARRAY_MAX > 2)
++          copy_flags_to_bit_array(af.bitvector, num7, 2);
++	     if(AF_ARRAY_MAX > 3)
++          copy_flags_to_bit_array(af.bitvector, num8, 3);
+       } else if (n_vars == 5) {       /* Old 32-bit conversion version */
+         if (num5 > 0 && num5 < NUM_AFF_FLAGS)  /* Ignore invalid values */
+           SET_BIT_AR(af.bitvector, num5);
+@@ -858,6 +866,24 @@
+   } while (num != 0);
+ }
+ 
++static void load_bit_affects(FILE *fl, struct char_data *ch)
++{
++  int arrays = 0, i = 0;
++  struct affected_type af;
++
++      new_affect(&af);
++      af.spell = fread_number(fl);
++      af.duration = fread_number(fl);
++      af.modifier = fread_number(fl);
++      af.location = fread_number(fl);
++	  arrays = fread_number(fl);
++	  if(arrays <= AF_ARRAY_MAX) { // should always be, but check anyways
++   for (i = 0; i < arrays; i++)
++	af.bitvector[i] = fread_number(fl);
++    }
++      affect_to_char(ch, &af);
++}
++
+ static void load_skills(FILE *fl, struct char_data *ch)
+ {
+   int num = 0, num2 = 0;
+diff -Naur srco/structs.h srcubf/structs.h
+--- srco/structs.h	2026-02-03 17:55:59.000000000 -0600
++++ srcubf/structs.h	2026-02-10 06:55:41.712827100 -0600
+@@ -203,6 +203,8 @@
+ #define PLR_IDEA         18   /**< Player is writing an idea */
+ #define PLR_TYPO         19   /**< Player is writing a typo */
+ 
++#define NUM_PLR_FLAGS      20
++
+ /* Mobile flags: used by char_data.char_specials.act */
+ #define MOB_SPEC            0   /**< Mob has a callable spec-proc */
+ #define MOB_SENTINEL        1   /**< Mob should not move */
+@@ -514,13 +516,13 @@
+ #define RENT_TIMEDOUT   5 /**< Character inv save status = timed out */
+ 
+ /* Settings for Bit Vectors */
+-#define RF_ARRAY_MAX    4  /**< # Bytes in Bit vector - Room flags */
+-#define PM_ARRAY_MAX    4  /**< # Bytes in Bit vector - Act and Player flags */
+-#define PR_ARRAY_MAX    4  /**< # Bytes in Bit vector - Player Pref Flags */
+-#define AF_ARRAY_MAX    4  /**< # Bytes in Bit vector - Affect flags */
+-#define TW_ARRAY_MAX    4  /**< # Bytes in Bit vector - Obj Wear Locations */
+-#define EF_ARRAY_MAX    4  /**< # Bytes in Bit vector - Obj Extra Flags */
+-#define ZN_ARRAY_MAX    4  /**< # Bytes in Bit vector - Zone Flags */
++#define RF_ARRAY_MAX    ((NUM_ROOM_FLAGS / 32) + 1) /**< # Bytes in Bit vector - Room flags */
++#define PM_ARRAY_MAX    (((NUM_PLR_FLAGS > NUM_MOB_FLAGS ? NUM_PLR_FLAGS : NUM_MOB_FLAGS)  / 32)  + 1)  /**< # Bytes in Bit vector - Act and Player flags */
++#define PR_ARRAY_MAX    ((NUM_PRF_FLAGS / 32) + 1)  /**< # Bytes in Bit vector - Player Pref Flags */
++#define AF_ARRAY_MAX    ((NUM_AFF_FLAGS / 32) + 1)  /**< # Bytes in Bit vector - Affect flags */
++#define TW_ARRAY_MAX    ((NUM_ITEM_WEARS / 32) + 1)  /**< # Bytes in Bit vector - Obj Wear Locations */
++#define EF_ARRAY_MAX    ((NUM_ITEM_FLAGS / 32) + 1)  /**< # Bytes in Bit vector - Obj Extra Flags */
++#define ZN_ARRAY_MAX    ((NUM_ZONE_FLAGS / 32) + 1)  /**< # Bytes in Bit vector - Zone Flags */
+ 
+ /* other #defined constants */
+ /* **DO**NOT** blindly change the number of levels in your MUD merely by
