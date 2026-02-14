@@ -388,7 +388,7 @@ diff -Naur srco/db.c srcubf/db.c
 +         
 +}
 +
-+void copy_flags_to_bit_array(int bitvector[], bitvector_t list, sh_int loc)
++void copy_flags_to_bit_array(int bitvector[], long list, sh_int loc)
 +{
 +sh_int bit;
 +    for(bit = 0; bit < 32; bit++) { 
@@ -448,7 +448,7 @@ diff -Naur srco/db.h srcubf/db.h
 +void load_bits_array(int bitvector[], int array_size, FILE *fp);
 +void save_bits_array(int bitvector[], int array_size, FILE *fp);
 +void zero_bits_array(int bitvector[], int array_size);
-+void copy_flags_to_bit_array(int bitvector[], bitvector_t list, sh_int loc);
++void copy_flags_to_bit_array(int bitvector[], long list, sh_int loc);
 +
  /* begin previously located in players.c, returned to db.c */
  extern struct player_index_element *player_table;
